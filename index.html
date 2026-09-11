@@ -647,7 +647,8 @@ let scopeYear = String(new Date().getFullYear()); // 1년 단위 선택 연도
 let rangeFrom = "", rangeTo = ""; // 지정 기간
 let listSort = { key: "date", dir: -1 }; // 목록 정렬 (기본: 날짜 내림차순)
 
-const httpMode = location.protocol === "http:" || location.protocol === "https:";
+// GitHub Pages(*.github.io)는 서버(도우미) 모드가 아니라 GitHub 공유 모드로 동작
+const httpMode = (location.protocol === "http:" || location.protocol === "https:") && !location.hostname.endsWith("github.io");
 let DB_NAME = localStorage.getItem("ledger-dbname") || "가계부DB.xlsx"; // 도우미 모드의 현재 DB 파일 (파일 변경으로 교체 가능, 기억됨)
 const TEMPLATE_NAME = "가계부DB_빈템플릿.xlsx"; // DB가 없을 때 이 파일로 초기화
 const fsMode = typeof window.showOpenFilePicker === "function";
@@ -3927,6 +3928,13 @@ async function initApp() {
     return;
   }
 
+  // GitHub Pages에서 아직 연결 전이면 파일 선택 화면 대신 연결 안내만
+  if (location.hostname.endsWith("github.io") && !ghActive()) {
+    $("connectOverlay").classList.add("hidden");
+    fileState("☁ 오른쪽 위 'GitHub' 버튼을 눌러 데이터 저장소를 연결하세요");
+    render();
+    return;
+  }
   // GitHub 공유 모드: 연결돼 있으면 파일 선택 없이 저장소에서 바로 불러옴
   if (ghActive()) {
     fileState("☁ GitHub 불러오는 중…");
