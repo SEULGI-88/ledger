@@ -2527,7 +2527,7 @@ $("ghBtn").addEventListener("click", async () => {
   const repoStr = await uiPrompt(
     `데이터를 공유할 GitHub <b>비공개 저장소</b>를 <b>아이디/저장소명</b> 형태로 입력하세요<br>
      <span style="color:var(--muted);font-size:12px">예: jeongi/ledger-data · 비우고 확인하면 연결 해제</span>`,
-    cur.owner ? cur.owner + "/" + cur.repo : "", "GitHub 연결 (1/2)");
+    cur.owner ? cur.owner + "/" + cur.repo : "SEULGI-88/ledger-data", "GitHub 연결 (1/2)");
   if (repoStr === null) return;
   if (!repoStr.trim()) {
     if (ghActive() && await uiConfirm("GitHub 연결을 해제할까요?<br>해제하면 다시 로컬 파일 방식으로 동작해요", { ok: "해제" })) {
