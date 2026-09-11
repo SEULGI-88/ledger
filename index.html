@@ -262,6 +262,61 @@
   #trendTip { display:none; position:fixed; z-index:9; background:var(--card); border:1px solid var(--border);
               border-radius:9px; box-shadow:var(--shadow); padding:7px 11px; font-size:12.5px; line-height:1.6;
               pointer-events:none; font-variant-numeric:tabular-nums; }
+  /* ═══════════ 모바일 전용 화면 ═══════════ */
+  #mApp { display:none; }
+  body.mobile #mainMenu, body.mobile #sideNav, body.mobile #savingsNav, body.mobile #idoNav, body.mobile #travelNav,
+  body.mobile #ledgerSection, body.mobile #travelSection, body.mobile #sectionPlaceholder,
+  body.mobile #connectOverlay { display:none !important; } /* 모바일은 GitHub 연결(설정 탭)만 사용 */
+  body.mobile { padding:0; }
+  body.mobile #mApp { display:flex; flex-direction:column; min-height:100dvh; }
+  #mHead { position:sticky; top:0; z-index:10; background:var(--card); border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:6px; padding:10px 12px 8px; }
+  #mHead .btn { padding:6px 12px; font-size:14px; }
+  #mTitle { flex:1; text-align:center; font-weight:700; font-size:16px; }
+  #mFile { display:block; text-align:center; font-size:10.5px; color:var(--muted); padding:3px 8px 6px; background:var(--card); border-bottom:1px solid var(--border); }
+  #mBody { flex:1; padding:12px 12px 96px; }
+  #mTabs { position:fixed; left:0; right:0; bottom:0; display:flex; background:var(--card); border-top:1px solid var(--border);
+    padding-bottom:env(safe-area-inset-bottom); z-index:12; }
+  #mTabs button { flex:1; border:none; background:none; padding:8px 0 6px; font-size:17px; color:var(--muted);
+    display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; font-family:inherit; }
+  #mTabs button span { font-size:10px; }
+  #mTabs button.active { color:var(--accent); font-weight:700; }
+  #mAddBtn { position:fixed; right:16px; bottom:calc(64px + env(safe-area-inset-bottom)); width:52px; height:52px; border-radius:50%;
+    background:var(--accent); color:#fff; font-size:26px; border:none; box-shadow:0 4px 14px rgba(26,115,232,.4); z-index:11; cursor:pointer; }
+  #mSheetWrap { position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:30; display:flex; align-items:flex-end; }
+  #mSheet { background:var(--card); width:100%; border-radius:16px 16px 0 0; padding:16px 16px calc(20px + env(safe-area-inset-bottom)); max-height:85dvh; overflow:auto; }
+  #mSheet .fld { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
+  #mSheet label { font-size:11.5px; color:var(--muted); }
+  #mSheet input, #mSheet select { padding:11px 12px; font-size:16px; border:1px solid var(--border); border-radius:10px; background:var(--card); color:inherit; font-family:inherit; }
+  #mAmt { font-size:22px !important; font-weight:700; text-align:right; }
+  .mtype { display:flex; gap:8px; margin-bottom:12px; }
+  .mtype button { flex:1; padding:10px; border-radius:10px; border:1px solid var(--border); background:none; font-size:14px; cursor:pointer; font-family:inherit; color:inherit; }
+  .mtype button.on-exp { background:var(--exp); color:#fff; border-color:var(--exp); font-weight:700; }
+  .mtype button.on-inc { background:var(--inc); color:#fff; border-color:var(--inc); font-weight:700; }
+  .mcal { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+  .mcal .wd { text-align:center; font-size:10.5px; color:var(--muted); padding:4px 0; }
+  .mcal .dc { min-height:52px; border-radius:8px; background:var(--card); padding:4px 3px; border:1px solid transparent; }
+  .mcal .dc .dn { font-size:11px; font-weight:600; }
+  .mcal .dc.red .dn { color:var(--exp); }
+  .mcal .dc.today { border-color:var(--accent); }
+  .mcal .dc.sel { background:var(--accent-soft); border-color:var(--accent); }
+  .mcal .dc .dv { color:var(--exp); font-size:9.5px; margin-top:2px; }
+  .mcal .dc .di { color:var(--inc); font-size:9.5px; }
+  .mday { font-size:11px; color:var(--muted); margin:12px 2px 4px; }
+  .mrow { display:flex; align-items:center; gap:8px; background:var(--card); border-radius:10px; padding:10px 12px; margin-bottom:6px; }
+  .mrow .tt { flex:1; min-width:0; }
+  .mrow .tt b { font-size:14px; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+  .mrow .tt small { font-size:11px; color:var(--muted); }
+  .mrow .amt { font-size:14px; font-weight:700; white-space:nowrap; }
+  .mrow .amt.e { color:var(--exp); } .mrow .amt.i { color:var(--inc); }
+  .mstats { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+  .mstat { background:var(--card); border-radius:12px; padding:12px; }
+  .mstat .l { font-size:11px; color:var(--muted); }
+  .mstat .v { font-size:16px; font-weight:700; margin-top:2px; }
+  .mbar { background:var(--card); border-radius:10px; padding:10px 12px; margin-bottom:6px; }
+  .mbar .bl { display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:5px; }
+  .mbar .bt { height:6px; border-radius:4px; background:var(--accent-soft); overflow:hidden; }
+  .mbar .bt i { display:block; height:100%; background:var(--chart-exp); }
 </style>
 </head>
 <body>
@@ -517,6 +572,25 @@
     <p style="font-size:13px;color:var(--text-2)">아직 준비 중인 메뉴예요 — 어떤 기능을 넣을지 말씀해주시면 만들어드릴게요.</p>
   </div>
 </div>
+<div id="mApp">
+  <header id="mHead">
+    <button class="btn" id="mPrev">◀</button>
+    <div id="mTitle"></div>
+    <button class="btn" id="mNext">▶</button>
+    <button class="btn" id="mToday">오늘</button>
+  </header>
+  <span id="mFile"></span>
+  <main id="mBody"></main>
+  <button id="mAddBtn">＋</button>
+  <nav id="mTabs">
+    <button data-mv="cal">📅<span>달력</span></button>
+    <button data-mv="list">☰<span>목록</span></button>
+    <button data-mv="stats">📊<span>요약</span></button>
+    <button data-mv="more">⚙<span>설정</span></button>
+  </nav>
+  <div id="mSheetWrap" class="hidden"><div id="mSheet"></div></div>
+</div>
+
 <div id="dlgOverlay" class="hidden">
   <div class="dlg">
     <h3 id="dlgTitle"></h3>
@@ -693,7 +767,11 @@ async function idbDel(k) {
   });
 }
 
-function fileState(msg) { $("fileState").textContent = msg; }
+function fileState(msg) {
+  $("fileState").textContent = msg;
+  const mf = document.getElementById("mFile");
+  if (mf) mf.textContent = msg;
+}
 
 /* 예쁜 대화상자 — alert/confirm/prompt 대체 */
 function dialog({ title, msg, buttons, input, value, placeholder }) {
@@ -1188,6 +1266,7 @@ function render() {
   else if (view === "fixed") renderFixed();
   const total = entries.length;
   $("statusLeft").textContent = total ? `전체 ${total.toLocaleString()}건 기록` : "";
+  if (typeof IS_MOBILE !== "undefined" && IS_MOBILE) mRender(); // 모바일 화면도 같이 갱신
 }
 
 /* 시작예산 체인 계산 — 원본 엑셀 수식과 동일:
@@ -4050,6 +4129,168 @@ async function initApp() {
   $("connectOverlay").classList.remove("hidden");
   render(); // 배경(빈 상태)도 그려둠
 }
+
+/* ═══════════ 모바일 전용 화면 ═══════════ */
+const IS_MOBILE = (matchMedia("(max-width:700px)").matches || /Android|iPhone|iPod/.test(navigator.userAgent)) && !location.search.includes("desktop");
+if (IS_MOBILE) document.body.classList.add("mobile");
+let mView = "cal";
+let mMonth = ym(new Date());
+let mDay = todayStr();
+const mfmt = (n) => (n || 0).toLocaleString("ko-KR");
+function mRender() {
+  if (!IS_MOBILE) return;
+  document.querySelectorAll("#mTabs button").forEach(b => b.classList.toggle("active", b.dataset.mv === mView));
+  $("mTitle").textContent = `${+mMonth.slice(0, 4)}년 ${+mMonth.slice(5, 7)}월`;
+  if (mView === "cal") mRenderCal();
+  else if (mView === "list") mRenderList();
+  else if (mView === "stats") mRenderStats();
+  else mRenderMore();
+}
+function mRowHtml(e) {
+  return `<div class="mrow" data-id="${e.id}">
+    <div class="tt"><b>${esc(e.title || "(내용 없음)")}</b><small>${esc(e.cat || "")}${e.who ? " · " + esc(e.who) : ""}</small></div>
+    <div class="amt ${e.type === "exp" ? "e" : "i"}">${e.type === "exp" ? "-" : "+"}${mfmt(e.amount)}</div></div>`;
+}
+function mBindRows(root) {
+  root.querySelectorAll(".mrow[data-id]").forEach(r => r.addEventListener("click", () => {
+    const e = entries.find(x => x.id === r.dataset.id);
+    if (e) mOpenSheet(e);
+  }));
+}
+function mRenderCal() {
+  const y = +mMonth.slice(0, 4), mo = +mMonth.slice(5, 7);
+  const first = new Date(y, mo - 1, 1), days = new Date(y, mo, 0).getDate();
+  const hol = holidaysOfYear(y);
+  let html = `<div class="mcal">` + ["일", "월", "화", "수", "목", "금", "토"].map(w => `<div class="wd">${w}</div>`).join("");
+  for (let i = 0; i < first.getDay(); i++) html += `<div></div>`;
+  const byDay = {};
+  entries.forEach(e => { if (e.date.startsWith(mMonth)) { byDay[e.date] = byDay[e.date] || { e: 0, i: 0 }; byDay[e.date][e.type === "exp" ? "e" : "i"] += e.amount; } });
+  for (let d = 1; d <= days; d++) {
+    const ds = `${mMonth}-${String(d).padStart(2, "0")}`;
+    const dow = new Date(y, mo - 1, d).getDay();
+    const isRed = dow === 0 || dow === 6 || hol[ds];
+    const s = byDay[ds];
+    html += `<div class="dc${isRed ? " red" : ""}${ds === todayStr() ? " today" : ""}${ds === mDay ? " sel" : ""}" data-d="${ds}">
+      <div class="dn">${d}</div>${s && s.e > 0 ? `<div class="dv">-${compactWon(s.e)}</div>` : ""}${s && s.i > 0 ? `<div class="di">+${compactWon(s.i)}</div>` : ""}</div>`;
+  }
+  html += `</div><div id="mDayList" style="margin-top:12px"></div>`;
+  $("mBody").innerHTML = html;
+  document.querySelectorAll(".mcal .dc").forEach(c => c.addEventListener("click", () => { mDay = c.dataset.d; mRenderCal(); }));
+  const list = entries.filter(e => e.date === mDay).sort((a, b) => (b.seq || 0) - (a.seq || 0));
+  const hd = hol[mDay] ? ` · <span style="color:var(--exp)">${esc(hol[mDay])}</span>` : "";
+  $("mDayList").innerHTML = `<div class="mday">${mDay}${hd}</div>` +
+    (list.length ? list.map(mRowHtml).join("") : `<div class="mrow" style="color:var(--muted);font-size:12.5px">내역 없음 — 오른쪽 아래 ＋로 추가</div>`);
+  mBindRows($("mDayList"));
+}
+function mRenderList() {
+  const list = entries.filter(e => fymE(e) === mMonth).sort((a, b) => b.date.localeCompare(a.date) || (b.seq || 0) - (a.seq || 0));
+  const inc = list.filter(e => e.type === "inc").reduce((a, e) => a + e.amount, 0);
+  const exp = list.filter(e => e.type === "exp").reduce((a, e) => a + e.amount, 0);
+  let html = `<div class="mstats"><div class="mstat"><div class="l">입금</div><div class="v" style="color:var(--inc)">+${mfmt(inc)}</div></div>
+    <div class="mstat"><div class="l">지출</div><div class="v" style="color:var(--exp)">-${mfmt(exp)}</div></div></div>`;
+  let last = "";
+  list.forEach(e => {
+    if (e.date !== last) { html += `<div class="mday">${e.date}</div>`; last = e.date; }
+    html += mRowHtml(e);
+  });
+  if (!list.length) html += `<div class="mrow" style="color:var(--muted)">이 달 내역이 없어요</div>`;
+  $("mBody").innerHTML = html;
+  mBindRows($("mBody"));
+}
+function mRenderStats() {
+  const bi = budgetInfo(mMonth, false);
+  const list = entries.filter(e => fymE(e) === mMonth);
+  const inc = list.filter(e => e.type === "inc").reduce((a, e) => a + e.amount, 0);
+  const exp = list.filter(e => e.type === "exp").reduce((a, e) => a + e.amount, 0);
+  let html = `<div class="mstats">
+    <div class="mstat"><div class="l">시작예산</div><div class="v">${bi.budget != null ? mfmt(bi.budget) : "-"}</div></div>
+    <div class="mstat"><div class="l">남은 금액</div><div class="v" style="color:${(bi.remain || 0) >= 0 ? "var(--inc)" : "var(--exp)"}">${bi.remain != null ? mfmt(bi.remain) : "-"}</div></div>
+    <div class="mstat"><div class="l">입금</div><div class="v" style="color:var(--inc)">+${mfmt(inc)}</div></div>
+    <div class="mstat"><div class="l">지출</div><div class="v" style="color:var(--exp)">-${mfmt(exp)}</div></div></div>
+    <div class="mday">지출 TOP 5 (내용별)</div>`;
+  const by = {};
+  list.filter(e => e.type === "exp").forEach(e => { const k = e.title || "기타"; by[k] = (by[k] || 0) + e.amount; });
+  const top = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const mx = top.length ? top[0][1] : 1;
+  top.forEach(([k, v]) => {
+    html += `<div class="mbar"><div class="bl"><span>${esc(k)}</span><b>-${mfmt(v)}</b></div><div class="bt"><i style="width:${Math.round(v / mx * 100)}%"></i></div></div>`;
+  });
+  if (!top.length) html += `<div class="mrow" style="color:var(--muted)">지출이 없어요</div>`;
+  $("mBody").innerHTML = html;
+}
+function mRenderMore() {
+  $("mBody").innerHTML = `
+    <div class="mstat" style="margin-bottom:10px"><div class="l">연결 상태</div><div class="v" style="font-size:13px;font-weight:400">${esc($("fileState").textContent || "-")}</div></div>
+    <button class="btn" id="mGh" style="width:100%;padding:12px;margin-bottom:8px">☁ GitHub 연결 설정</button>
+    <button class="btn" id="mReload" style="width:100%;padding:12px;margin-bottom:8px">↻ 최신 데이터 다시 불러오기</button>
+    <button class="btn" id="mDesk" style="width:100%;padding:12px">🖥 PC 화면으로 보기</button>
+    <p style="font-size:11.5px;color:var(--muted);margin-top:14px">고정지출·통계 차트·여행기록은 PC 화면에서 쓸 수 있어요.</p>`;
+  $("mGh").addEventListener("click", () => $("ghBtn").click());
+  $("mReload").addEventListener("click", async () => {
+    if (ghActive()) { try { await ghLoad(true); mRender(); toast("최신 데이터를 불러왔어요"); } catch (e) { toast("불러오기 실패: " + e.message); } }
+    else location.reload();
+  });
+  $("mDesk").addEventListener("click", () => { location.href = location.pathname + "?desktop=1"; });
+}
+function mOpenSheet(e) { // e 있으면 수정, 없으면 새 입력
+  const isEdit = !!e;
+  const d = e ? { ...e } : { type: "exp", date: mView === "cal" ? mDay : todayStr(), who: "슬구", cat: "", title: "", amount: 0 };
+  $("mSheetWrap").classList.remove("hidden");
+  $("mSheet").innerHTML = `
+    <div class="mtype">
+      <button id="mTexp" class="${d.type === "exp" ? "on-exp" : ""}">지출</button>
+      <button id="mTinc" class="${d.type === "inc" ? "on-inc" : ""}">입금</button>
+    </div>
+    <div class="fld"><label>금액</label><input id="mAmt" inputmode="numeric" value="${d.amount ? d.amount.toLocaleString() : ""}" placeholder="0"></div>
+    <div class="fld"><label>내용</label><input id="mTitleIn" value="${esc(d.title || "")}" placeholder="예: 점심"></div>
+    <div style="display:flex;gap:8px">
+      <div class="fld" style="flex:1"><label>날짜</label><input id="mDate" inputmode="numeric" value="${d.date}" placeholder="260911, 9/11"></div>
+      <div class="fld" style="width:92px"><label>누구</label><select id="mWho">${["슬구", "쩡이"].map(w => `<option${d.who === w ? " selected" : ""}>${w}</option>`).join("")}</select></div>
+    </div>
+    <div class="fld"><label>카테고리</label><select id="mCat">${catOptions(d.type, d.cat || DEFAULT_CATS[d.type][0])}</select></div>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      ${isEdit ? `<button class="btn" id="mDel" style="color:var(--exp);padding:12px 16px">🗑</button>` : ""}
+      <button class="btn" id="mCancel" style="flex:1;padding:12px">취소</button>
+      <button class="add-btn" id="mSave" style="flex:2;padding:12px">저장</button>
+    </div>`;
+  const setType = (t) => { d.type = t; $("mTexp").className = t === "exp" ? "on-exp" : ""; $("mTinc").className = t === "inc" ? "on-inc" : ""; $("mCat").innerHTML = catOptions(t, null); };
+  $("mTexp").addEventListener("click", () => setType("exp"));
+  $("mTinc").addEventListener("click", () => setType("inc"));
+  $("mAmt").addEventListener("input", () => { const raw = $("mAmt").value.replace(/[^\d]/g, ""); $("mAmt").value = raw ? Number(raw).toLocaleString("ko-KR") : ""; });
+  $("mCancel").addEventListener("click", mCloseSheet);
+  $("mSheetWrap").addEventListener("click", (ev) => { if (ev.target.id === "mSheetWrap") mCloseSheet(); }, { once: true });
+  if (isEdit) $("mDel").addEventListener("click", async () => {
+    if (!await uiConfirm("이 내역을 삭제할까요?", { ok: "삭제" })) return;
+    entries = entries.filter(x => x.id !== e.id);
+    save(); mCloseSheet(); mRender();
+    toast("삭제했어요");
+  });
+  $("mSave").addEventListener("click", () => {
+    const amount = parseAmount($("mAmt").value);
+    if (!amount) { toast("금액을 입력하세요"); return; }
+    const date = smartDate($("mDate").value, +mMonth.slice(0, 4));
+    if (!date) { toast("날짜 형식을 확인하세요 (예: 260911)"); return; }
+    const data = { type: d.type, who: $("mWho").value, cat: $("mCat").value || "기타", title: $("mTitleIn").value.trim(), amount };
+    if (isEdit) {
+      const t = entries.find(x => x.id === e.id);
+      if (t) { if (t.date !== date) { t.date = date; delete t.fm; } Object.assign(t, data); }
+      toast("수정했어요");
+    } else {
+      entries.push({ id: uid(), seq: ++seqGen, date, ...data });
+      toast((d.type === "exp" ? "지출 " : "입금 ") + fmtWon(amount) + " 추가");
+    }
+    save(); mCloseSheet();
+    if (mView === "cal") mDay = date;
+    mRender();
+  });
+  $("mAmt").focus();
+}
+function mCloseSheet() { $("mSheetWrap").classList.add("hidden"); }
+$("mAddBtn").addEventListener("click", () => mOpenSheet(null));
+document.querySelectorAll("#mTabs button").forEach(b => b.addEventListener("click", () => { mView = b.dataset.mv; mRender(); }));
+$("mPrev").addEventListener("click", () => { mMonth = monthKeyShift(mMonth, -1); mDay = mMonth + "-01"; mRender(); });
+$("mNext").addEventListener("click", () => { mMonth = monthKeyShift(mMonth, 1); mDay = mMonth + "-01"; mRender(); });
+$("mToday").addEventListener("click", () => { mMonth = ym(new Date()); mDay = todayStr(); mRender(); });
 
 initApp();
 </script>
