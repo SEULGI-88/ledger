@@ -66,6 +66,9 @@
   .month-nav .btn { padding:5px 10px; }
   .month-title { font-size:15.5px; font-weight:700; min-width:108px; text-align:center; }
   #monthTitle { display:inline-block; width:200px; } /* 기간 표기가 붙어도 ◀▶ 버튼 위치 고정 */
+  /* 부팅 순간(스크립트 실행 전) 저장된 탭이 달력이 아니면 달력을 먼저 그리지 않음 */
+  html[data-bootview] #calendarView, html[data-bootmenu] #ledgerSection { display:none; }
+  html.booting body { visibility:hidden; } /* 보던 탭으로 전환이 끝나기 전엔 본문 미표시 */
   .head-actions { display:flex; gap:8px; }
   .btn { padding:7px 13px; border:1px solid var(--border); border-radius:10px; background:var(--card);
          font-size:12.5px; cursor:pointer; color:var(--text-2); font-family:inherit; transition:all .12s; }
@@ -159,6 +162,7 @@
   .day-sep.drop-target td { background:var(--accent-soft) !important; color:var(--accent) !important; }
   .chk-col { width:88px; white-space:nowrap; }
   th.sortable { cursor:pointer; user-select:none; }
+  .ledger-table th select.sel { font-weight:700; color:inherit; } /* 헤더 필터 셀렉트도 헤더처럼 굵게 */
   th.sortable:hover { color:var(--accent); }
   .sort-btn { border:none; background:none; cursor:pointer; font-size:11px; color:var(--muted); padding:2px 4px; vertical-align:middle; }
   .sort-btn:hover, .sort-btn.on { color:var(--accent); }
@@ -185,6 +189,13 @@
 
   /* 목록 */
   .ledger-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .ledger-table td { overflow:hidden; text-overflow:ellipsis; } /* 고정 레이아웃 표에서 긴 내용 넘침 방지 */
+  .ledger-table tr.edit-row td { overflow:visible; } /* 편집 줄 입력칸은 잘리지 않게 */
+  .ledger-table tr.edit-row .er-title { width:100%; box-sizing:border-box; }
+  .ledger-table thead th { white-space:nowrap; } /* 헤더 셀렉트+정렬버튼 한 줄 유지 */
+  #listView thead th, #fixedView thead th { padding-left:6px; padding-right:2px; }
+  .ledger-table thead th .sel { width:auto; max-width:calc(100% - 18px); vertical-align:middle; }
+  .ledger-table thead th .sort-btn { vertical-align:middle; padding:2px 2px; }
   .ledger-table th { text-align:left; padding:10px 14px; font-size:11.5px; color:var(--muted); font-weight:600;
                      border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--card-2); z-index:5; } /* 행 내부 체크박스·버튼이 헤더 위로 비치지 않게 */
   .ledger-table td { padding:8.5px 14px; border-bottom:1px solid var(--border-2); white-space:nowrap; }
@@ -271,7 +282,7 @@
   /* ═══════════ 모바일 전용 화면 ═══════════ */
   #mApp { display:none; }
   body.mobile #mainMenu, body.mobile #sideNav, body.mobile #savingsNav, body.mobile #idoNav, body.mobile #travelNav,
-  body.mobile #ledgerSection, body.mobile #travelSection, body.mobile #sectionPlaceholder,
+  body.mobile #ledgerSection, body.mobile #travelSection, body.mobile #sectionPlaceholder, body.mobile #stockView, body.mobile #savingsView, body.mobile #pensionView, body.mobile #estateView, body.mobile #loanView,
   body.mobile #connectOverlay { display:none !important; } /* 모바일은 GitHub 연결(설정 탭)만 사용 */
   body.mobile { padding:0; }
   body.mobile #mApp { display:flex; flex-direction:column; min-height:100dvh; }
@@ -326,6 +337,20 @@
 </style>
 </head>
 <body>
+<script>
+/* 첫 페인트 전에 보던 탭/메뉴 반영 — 다른 화면이 스치듯 보이는 것 방지 (본 스크립트가 정식 전환 후 해제) */
+try {
+  var __ui = {};
+  try { __ui = JSON.parse(localStorage.getItem("ledgerUiState") || "{}"); } catch (e2) {}
+  var __h = location.hash.match(/^#([a-z]+)\/([a-z]+)/); // 주소가 화면을 결정 (예: #ledger/fixed)
+  var __bm = (__h && __h[1]) || __ui.menu;
+  var __bv = (__h && __h[2]) || __ui.view;
+  if (__bv && __bv !== "calendar") document.documentElement.dataset.bootview = __bv;
+  if (__bm && __bm !== "ledger") document.documentElement.dataset.bootmenu = __bm;
+  document.documentElement.classList.add("booting"); // 전환 완료 전엔 본문을 그리지 않음
+  setTimeout(function () { document.documentElement.classList.remove("booting"); }, 2500); // 안전장치
+} catch (e) {}
+</script>
 <nav id="mainMenu">
   <span class="brand">JS</span>
   <button class="nav-item active" data-menu="ledger">가계부</button>
@@ -334,15 +359,18 @@
   <button class="nav-item" data-menu="travel">여행기록</button>
 </nav>
 <aside id="sideNav">
-  <button class="side-item active" data-view="calendar"><span class="si-icon">📅</span><span>달력</span></button>
-  <button class="side-item" data-view="list"><span class="si-icon">☰</span><span>목록</span></button>
+  <button class="side-item" data-view="list"><span class="si-icon">☰</span><span>생활비</span></button>
+  <button class="side-item" data-view="region"><span class="si-icon">💳</span><span>지역카드</span></button>
   <button class="side-item" data-view="fixed"><span class="si-icon">🔁</span><span>고정지출</span></button>
+  <button class="side-item" data-view="calendar"><span class="si-icon">📅</span><span>달력</span></button>
   <button class="side-item" data-view="chart"><span class="si-icon">📈</span><span>통계</span></button>
 </aside>
 <aside id="savingsNav" class="hidden">
-  <button class="side-item active" data-sv="deposit"><span class="si-icon">💰</span><span>적금</span></button>
-  <button class="side-item" data-sv="stock"><span class="si-icon">📈</span><span>주식</span></button>
+  <button class="side-item active" data-sv="stock"><span class="si-icon">📈</span><span>주식</span></button>
   <button class="side-item" data-sv="pension"><span class="si-icon">🏖️</span><span>퇴직연금</span></button>
+  <button class="side-item" data-sv="deposit"><span class="si-icon">💰</span><span>적금</span></button>
+  <button class="side-item" data-sv="estate"><span class="si-icon">🏠</span><span>부동산</span></button>
+  <button class="side-item" data-sv="loan"><span class="si-icon">🏦</span><span>대출</span></button>
   <button class="side-item" data-sv="stats"><span class="si-icon">📊</span><span>통계</span></button>
 </aside>
 <aside id="idoNav" class="hidden">
@@ -402,16 +430,6 @@
       <input type="text" id="rangeFromIn" class="sel" inputmode="numeric" placeholder="260801" style="width:92px"> ~ <input type="text" id="rangeToIn" class="sel" inputmode="numeric" placeholder="260831" style="width:92px">
     </span>
     <select id="yearCtrl" class="sel" style="display:none"></select>
-    <div class="tabs" id="typeFilterTabs">
-      <button class="tab active" data-tf="all">전체</button>
-      <button class="tab" data-tf="exp">지출</button>
-      <button class="tab" data-tf="inc">입금</button>
-    </div>
-    <div class="tabs" id="settleFilterTabs" style="display:none">
-      <button class="tab active" data-sf="all">전체</button>
-      <button class="tab" data-sf="undone">미정산</button>
-      <button class="tab" data-sf="done">정산완료</button>
-    </div>
     <div class="searchbox"><input type="text" id="searchInput" placeholder="검색..."></div>
   </div>
   <div class="stats" id="stats"></div>
@@ -422,7 +440,7 @@
       <button id="typeExp" class="exp-on">지출</button>
       <button id="typeInc">입금</button>
     </div>
-    <select id="inWho" style="width:82px"><option>슬구</option><option>쩡이</option></select>
+    <select id="inWho" style="width:82px"><option>슬구</option><option>쩡이</option><option>현금</option></select>
     <select id="inCat" style="width:110px"></select>
     <input type="text" id="inTitle" placeholder="내용 (예: 점심 김치찌개)">
     <input type="text" id="inAmount" placeholder="금액" inputmode="numeric">
@@ -437,15 +455,17 @@
 
   <div id="listView" class="hidden">
     <div class="card table-scroll">
-      <table class="ledger-table">
+      <table class="ledger-table" style="table-layout:fixed">
+        <colgroup><col style="width:100px"><col style="width:84px"><col style="width:84px"><col style="width:104px"><col><col style="width:116px"><col style="width:88px"><col style="width:64px"></colgroup>
         <thead><tr>
           <th class="sortable" data-sort="date" data-label="날짜">날짜</th>
-          <th class="sortable" data-sort="type" data-label="구분">구분</th>
-          <th class="sortable" data-sort="who" data-label="누구">누구</th>
+          <th><select id="lsTypeSel" class="sel" style="padding:3px 6px;font-size:11.5px;width:100%"></select> <button class="sort-btn" data-lsk="type" title="구분 정렬">↕</button></th>
+          <th><select id="lsWhoSel" class="sel" style="padding:3px 6px;font-size:11.5px;width:100%"></select> <button class="sort-btn" data-lsk="who" title="멤버 정렬">↕</button></th>
+          <th><select id="lsCatSel" class="sel" style="padding:3px 6px;font-size:11.5px;width:100%"></select> <button class="sort-btn" data-lsk="cat" title="카테고리 정렬">↕</button></th>
           <th class="sortable" data-sort="title" data-label="내용">내용</th>
           <th class="amt-h sortable" data-sort="amount" data-label="금액">금액</th>
-          <th class="chk-col"><input type="checkbox" id="chkAll" title="전체 정산완료"> 정산</th>
-          <th style="text-align:right"><button class="add-btn" id="listAddBtn" style="padding:5px 14px">＋ 추가</button></th></tr></thead>
+          <th class="chk-col"><input type="checkbox" id="chkAll" title="보이는 지출 전체 정산"> <select id="lsSettleSel" class="sel" style="padding:3px 6px;font-size:11px;width:100%"></select></th>
+          <th style="text-align:right"><button class="add-btn" id="listAddBtn" style="padding:5px 14px">＋</button></th></tr></thead>
         <tbody id="listBody"></tbody>
       </table>
     </div>
@@ -458,7 +478,7 @@
           <span class="chart-title"><span class="drag-handle" title="끌어서 위치 이동">⠿</span><span id="catChartTitle">지출 분포</span>
             <select id="catChartMode" class="sel" style="margin-left:6px">
               <option value="title">내용별</option>
-              <option value="who">누구별</option>
+              <option value="who">멤버별</option>
               <option value="cat">카테고리별</option>
             </select>
             <select id="catChartShape" class="sel" style="margin-left:4px">
@@ -493,9 +513,34 @@
         <div class="chart-head"><span class="chart-title"><span class="drag-handle" title="끌어서 위치 이동">⠿</span>월별 고정지출 추이</span><span class="chart-sub" id="fxStatMSub"></span></div>
         <div id="fxStatMonthly"></div>
       </div>
+      <div class="card chart-card chart-slot" data-chart="who">
+        <div class="chart-head"><span class="chart-title"><span class="drag-handle" title="끌어서 위치 이동">⠿</span>멤버별 지출·입금</span><span class="chart-sub" id="whoStatSub"></span></div>
+        <div id="whoStatChart"></div>
+      </div>
+      <div class="card chart-card chart-slot" data-chart="eat">
+        <div class="chart-head"><span class="chart-title"><span class="drag-handle" title="끌어서 위치 이동">⠿</span>외식·배달·카페
+          <select id="eatShape" class="sel" style="margin-left:6px">
+            <option value="donut">도넛형</option>
+            <option value="bar">막대형</option>
+          </select></span><span class="chart-sub" id="eatSub"></span></div>
+        <div id="eatBig" style="font-size:26px;font-weight:700;color:var(--exp);margin:2px 0 8px"></div>
+        <div id="eatChart" style="margin-bottom:10px"></div>
+        <div id="eatMonthly"></div>
+      </div>
     </div>
   </div>
 
+  <div id="regionView" class="hidden">
+    <div class="stats" id="regionCards" style="margin-bottom:12px"></div>
+    <div class="card table-scroll">
+      <table class="ledger-table">
+        <thead><tr><th>카드</th><th>멤버</th><th>날짜</th><th>구분</th><th>내용</th><th class="amt-h">금액</th>
+          <th style="text-align:right"><button class="add-btn" id="regionAddBtn" style="padding:5px 14px">＋ 추가</button></th></tr></thead>
+        <tbody id="regionBody"></tbody>
+      </table>
+    </div>
+    <p style="font-size:11.5px;color:var(--muted);margin-top:8px">충전하면 잔액이 늘고, 사용 내역을 넣으면 잔액이 줄어요 · 남은 금액 = 충전 − 사용</p>
+  </div>
   <div id="fixedView" class="hidden">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
       <div class="tabs" id="fxTabs" style="display:inline-flex">
@@ -506,8 +551,8 @@
     <div class="stats" id="fxSummary"></div>
     <div class="card table-scroll">
       <table class="ledger-table">
-        <thead><tr><th><select id="fxCatFilterSel" class="sel" style="padding:3px 7px;font-size:11.5px;max-width:130px"></select> <button class="sort-btn" data-fxsort="cat" title="대분류 정렬">↕</button></th><th class="sortable" data-fxsort="name" data-label="소분류">소분류</th><th id="fxWhoTh"><select id="fxWhoFilterSel" class="sel" style="padding:3px 7px;font-size:11.5px"></select> <button class="sort-btn" data-fxsort="who" title="누구 정렬">↕</button></th><th id="fxDateTh" class="sortable" data-fxsort="date" data-label="날짜">날짜</th><th class="amt-h sortable" data-fxsort="amt" data-label="금액">금액</th>
-          <th class="chk-col">정산</th>
+        <thead><tr><th><select id="fxCatFilterSel" class="sel" style="padding:3px 7px;font-size:11.5px;width:110px"></select> <button class="sort-btn" data-fxsort="cat" title="대분류 정렬">↕</button></th><th class="sortable" data-fxsort="name" data-label="소분류">소분류</th><th id="fxWhoTh"><select id="fxWhoFilterSel" class="sel" style="padding:3px 7px;font-size:11.5px;width:76px"></select> <button class="sort-btn" data-fxsort="who" title="멤버 정렬">↕</button></th><th id="fxDateTh" class="sortable" data-fxsort="date" data-label="날짜">날짜</th><th class="amt-h sortable" data-fxsort="amt" data-label="금액">금액</th>
+          <th class="chk-col"><select id="fxSettleFilterSel" class="sel" style="padding:3px 6px;font-size:11px;width:72px"></select></th>
           <th style="text-align:right"><button class="add-btn" id="fxAddBtn" style="padding:5px 14px">＋ 추가</button></th></tr></thead>
         <tbody id="fxBody"></tbody>
       </table>
@@ -573,6 +618,68 @@
       </div>
     </div>
   </div>
+  <div id="estateView" class="hidden">
+    <div class="stats" id="estCards" style="margin-bottom:12px"></div>
+    <div class="card table-scroll">
+      <table class="ledger-table">
+        <thead><tr><th>부동산</th><th class="amt-h">매입가</th><th class="amt-h">현재시세</th><th class="amt-h">평가손익</th><th>메모</th>
+          <th style="text-align:right"><button class="add-btn" id="estAddBtn" style="padding:5px 14px">＋ 추가</button></th></tr></thead>
+        <tbody id="estBody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div id="loanView" class="hidden">
+    <div class="stats" id="loanCards" style="margin-bottom:12px"></div>
+    <div class="card table-scroll">
+      <table class="ledger-table">
+        <thead><tr><th>대출</th><th class="amt-h">잔액</th><th class="amt-h">금리</th><th class="amt-h">월상환</th><th>메모</th>
+          <th style="text-align:right"><button class="add-btn" id="loanAddBtn" style="padding:5px 14px">＋ 추가</button></th></tr></thead>
+        <tbody id="loanBody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div id="pensionView" class="hidden">
+    <div class="stats" id="penCards" style="margin-bottom:12px"></div>
+    <div class="card table-scroll">
+      <table class="ledger-table">
+        <thead><tr>
+          <th>멤버</th><th>종류</th><th>종목·코드</th><th class="amt-h">수량</th><th class="amt-h">평단가</th>
+          <th class="amt-h">현재가</th><th class="amt-h">평가금액</th><th class="amt-h">수익률</th>
+          <th style="text-align:right"><button class="add-btn" id="penAddBtn" style="padding:5px 14px">＋ 추가</button></th>
+        </tr></thead>
+        <tbody id="penBody"></tbody>
+      </table>
+    </div>
+    <p style="font-size:11.5px;color:var(--muted);margin-top:8px">ETF는 코드(6자리) 입력 시 시세 자동 갱신 · 채권·예금은 평가금액을 직접 입력하세요.</p>
+  </div>
+  <div id="savingsView" class="hidden">
+    <div class="stats" id="savCards" style="margin-bottom:12px"></div>
+    <div class="card table-scroll">
+      <table class="ledger-table">
+        <thead><tr>
+          <th>멤버</th><th>종류</th><th class="amt-h">금액</th><th class="amt-h">연이율</th><th>기간</th>
+          <th class="amt-h">원금</th><th class="amt-h">세후이자</th><th class="amt-h">만기수령</th>
+          <th style="text-align:right"><button class="add-btn" id="savAddBtn" style="padding:5px 14px">＋ 추가</button></th>
+        </tr></thead>
+        <tbody id="savBody"></tbody>
+      </table>
+    </div>
+    <p style="font-size:11.5px;color:var(--muted);margin-top:8px">이자소득세 15.4%(소득세 14%＋지방세 1.4%)를 세전이자에서 자동 공제. 비과세 상품은 추가 시 체크하세요. 단리 기준 예상치입니다.</p>
+  </div>
+  <div id="stockView" class="hidden">
+    <div class="stats" id="stkCards" style="margin-bottom:12px"></div>
+    <div class="card table-scroll">
+      <table class="ledger-table">
+        <thead><tr>
+          <th>멤버</th><th>종목명</th><th>시장·코드</th><th class="amt-h">수량</th><th class="amt-h">평단가</th>
+          <th class="amt-h">현재가</th><th class="amt-h">평가금액</th><th class="amt-h">수익금</th><th class="amt-h">수익률</th>
+          <th style="text-align:right"><button class="add-btn" id="stkAddBtn" style="padding:5px 14px">＋ 추가</button></th>
+        </tr></thead>
+        <tbody id="stkBody"></tbody>
+      </table>
+    </div>
+    <p id="stkNote" style="font-size:11.5px;color:var(--muted);margin-top:8px"></p>
+  </div>
   <div id="sectionPlaceholder" class="card hidden" style="padding:60px 20px;text-align:center;margin-top:8px">
     <div style="font-size:38px;margin-bottom:12px">🚧</div>
     <h2 id="phTitle" style="font-size:17px;margin-bottom:6px"></h2>
@@ -609,16 +716,14 @@
 <div class="toast" id="toast"></div>
 <div id="trendTip"></div>
 <script src="d3.min.js"></script>
-<script src="world-geo.js"></script>
-<link rel="stylesheet" href="leaflet.css">
-<script src="leaflet.js"></script>
+<!-- 지도 라이브러리(world-geo/leaflet, 570KB)는 여행 지도를 열 때만 로드 — 초기 로딩 속도 개선 -->
 
 <script>
 "use strict";
 /* ═══════════ 데이터 ═══════════ */
 const STORAGE_KEY = "ledger-v1";
 const DEFAULT_CATS = {
-  exp: ["식비", "카페/간식", "교통", "주거/관리비", "통신", "쇼핑", "의료/건강", "미용", "문화/여가", "구독", "경조사", "기타"],
+  exp: ["장보기", "배달", "외식", "카페/간식", "교통", "주거/관리비", "통신", "쇼핑", "의료/건강", "미용", "문화/여가", "구독", "경조사", "여민전", "대전사랑카드", "기타"],
   inc: ["입금", "추가입금", "이자", "급여", "기타"]
 };
 // 매년 반복 기념일 ("MM-DD": 표시명) — 달력에 표시됨
@@ -680,9 +785,18 @@ let entries = [];   // {id, date:"YYYY-MM-DD", type:"exp"|"inc", cat, title, amo
 let fixedItems = []; // 고정지출: {id, cat, name, who, amt, period, year} — 엑셀 "고정지출" 시트로 저장
 let travelTrips = []; // 여행 목록: {name, start, end} — 엑셀 "여행목록" 시트
 let travelItems = []; // 여행 내역: {id, trip, date, title, amount, memo} — 엑셀 "여행내역" 시트
+let stocks = []; // 주식: {id, who(쩡이/슬구), market(KR/US), code, name, avg, qty} — 엑셀 "주식" 시트
+let stockPrices = { prices: {}, usdkrw: null, updated: null }; // 시세 — GitHub Actions가 장 마감 후 prices.json 갱신
+let stocksDirty = false; // 종목 목록이 바뀌면 stocks.json 재업로드
+let savings = []; // 적금/예금: {id, who, kind(적금/예금), amount(월납입 또는 예치금), rate(연이율%), start, end, taxFree} — 엑셀 "적금" 시트
+let pension = []; // 퇴직연금: {id, who, kind(ETF/채권/예금), name, code(ETF), avg(ETF), qty(ETF), amount(채권·예금 평가금액)} — 엑셀 "퇴직연금" 시트
+let estates = []; // 부동산: {id, name, buy(매입가), now(현재시세), memo} — 엑셀 "부동산" 시트
+let loans = []; // 대출: {id, name, balance(잔액), rate(금리%), monthly(월상환), memo} — 엑셀 "대출" 시트
+let regionTx = []; // 지역카드 내역: {id, card(카드명), who(멤버), date, type("충전"|"사용"), title, amount} — 엑셀 "지역카드" 시트
+const REGION_CARDS = ["여민전", "대전사랑카드"]; // 지역카드 종류
 let budgets = {};   // {"YYYY-MM": 시작예산(원)} — 엑셀 "예산" 시트로 저장
 let curMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-let view = "calendar";
+let view = "list"; // 기본 = 사이드바 첫 항목(생활비)
 let selectedDay = null;
 let dailyDay = null; // 일별 차트에서 클릭한 날짜
 let editId = null;
@@ -727,6 +841,8 @@ let searchScope = "month"; // 검색 범위: month(이번 달)/range(지정 기�
 let scopeYear = String(new Date().getFullYear()); // 1년 단위 선택 연도
 let rangeFrom = "", rangeTo = ""; // 지정 기간
 let listSort = { key: "date", dir: -1 }; // 목록 정렬 (기본: 날짜 내림차순)
+let whoFilter = ""; // 생활비 누구 헤더 필터 (""=전체)
+let catFilter = ""; // 생활비 카테고리 헤더 필터 (""=전체)
 
 // GitHub Pages(*.github.io)는 서버(도우미) 모드가 아니라 GitHub 공유 모드로 동작
 const httpMode = (location.protocol === "http:" || location.protocol === "https:") && !location.hostname.endsWith("github.io");
@@ -834,7 +950,7 @@ function b64FromBytes(bytes) {
   return btoa(s);
 }
 function mirrorToLocal() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems })); } catch (e) {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx })); } catch (e) {}
 }
 async function ghLoad(keepMonth) { // true 반환 = 불러옴, false = 저장소에 파일 없음
   const res = await fetch(ghApiUrl() + "?ref=" + (ghCfg.branch || "main") + "&t=" + Date.now(), { headers: ghHeaders(), cache: "no-store" });
@@ -843,8 +959,8 @@ async function ghLoad(keepMonth) { // true 반환 = 불러옴, false = 저장소
   const j = await res.json();
   ghSha = j.sha;
   const bin = Uint8Array.from(atob(String(j.content || "").replace(/\n/g, "")), c => c.charCodeAt(0));
-  const { all, budgets: b, starts, fixed, tvTrips, tvItems } = await fileToEntries(ghCfg.path || "가계부DB.xlsx", bin.buffer);
-  entries = all; budgets = b || {}; monthStarts = starts || {}; fixedItems = fixed || []; travelTrips = tvTrips || []; travelItems = tvItems || [];
+  const { all, budgets: b, starts, fixed, tvTrips, tvItems, stocks: stk, savings: sav, pension: pen, estates: est, loans: lo, regionTx: rtx } = await fileToEntries(ghCfg.path || "가계부DB.xlsx", bin.buffer);
+  entries = all; budgets = b || {}; monthStarts = starts || {}; fixedItems = fixed || []; travelTrips = tvTrips || []; travelItems = tvItems || []; stocks = stk || []; savings = sav || []; pension = pen || []; estates = est || []; loans = lo || []; regionTx = rtx || [];
   if (!keepMonth) {
     const latest = entries.reduce((a, e) => e.date > a ? e.date : a, "");
     if (latest) curMonth = new Date(+latest.slice(0, 4), +latest.slice(5, 7) - 1, 1);
@@ -876,6 +992,7 @@ async function ghWrite() {
     const j = await res.json();
     ghSha = j.content.sha;
     fileState(`☁ ${ghCfg.owner}/${ghCfg.repo} · 저장됨`);
+    if (stocksDirty) ghWriteStocks(); // 종목 목록도 함께 갱신
   } catch (e) {
     console.error(e);
     fileState("⚠ GitHub 저장 실패 — 인터넷/토큰 확인");
@@ -904,12 +1021,12 @@ function save() {
   }
   if (fsMode && fileHandle) {
     // 빠른 표시용 미러 (다음 실행 때 연결 전에도 데이터가 바로 보이게)
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems })); } catch (e) {}
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx })); } catch (e) {}
     fileState("저장 중…");
     clearTimeout(writeTimer);
     writeTimer = setTimeout(writeToFile, 500);
   } else {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx }));
   }
 }
 
@@ -1020,7 +1137,7 @@ function buildXlsx() {
       S("C1", "입금 합계", 3) + F("D1", 'SUMIF(B5:B2000,"입금",F5:F2000)', 2) +
       S("E1", "지출 합계", 3) + F("F1", 'SUMIF(B5:B2000,"지출",F5:F2000)', 2) + `</row>`;
     body += `<row r="2">` + S("A2", "남은 금액", 3) + F("B2", "B1-F1", 2) + `</row>`;
-    body += `<row r="4">` + ["날짜", "구분", "누구", "카테고리", "내용", "금액", "정산"].map((h, ci) => S(colLetter(ci) + "4", h, 3)).join("") + `</row>`;
+    body += `<row r="4">` + ["날짜", "구분", "멤버", "카테고리", "내용", "금액", "정산"].map((h, ci) => S(colLetter(ci) + "4", h, 3)).join("") + `</row>`;
     list.forEach((e, ri) => {
       const r = ri + 5;
       body += `<row r="${r}">` +
@@ -1061,7 +1178,7 @@ function buildXlsx() {
     const idx = sheetRefs.length + 1;
     let fbody = `<row r="1">` + S("A1", "매달 쩡이", 3) + F("B1", 'SUMIFS(D3:D300,C3:C300,"쩡이",E3:E300,"월")', 2) +
       S("C1", "매달 슬구", 3) + F("D1", 'SUMIFS(D3:D300,C3:C300,"슬구",E3:E300,"월")', 2) + `</row>`;
-    fbody += `<row r="2">` + ["대분류", "소분류", "누구", "금액", "주기", "연도", "고정핀", "월별금액", "날짜", "월별날짜", "정산", "월별정산"].map((h, ci) => S(colLetter(ci) + "2", h, 3)).join("") + `</row>`;
+    fbody += `<row r="2">` + ["대분류", "소분류", "멤버", "금액", "주기", "연도", "고정핀", "월별금액", "날짜", "월별날짜", "정산", "월별정산"].map((h, ci) => S(colLetter(ci) + "2", h, 3)).join("") + `</row>`;
     fixedItems.forEach((it, i) => {
       const r = i + 3;
       const per = normFxPeriod(it.period || "월");
@@ -1107,6 +1224,84 @@ function buildXlsx() {
     fileList.push([`xl/worksheets/sheet${idx}.xml`,
       enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${tb}</sheetData></worksheet>`)]);
     sheetRefs.push({ mon: "여행내역", idx });
+  }
+  if (stockPrices && stockPrices.prices && Object.keys(stockPrices.prices).length) { // 시세 스냅샷 시트 (로컬에서도 수익률 표시용)
+    const idx = sheetRefs.length + 1;
+    let tb = `<row r="1">` + ["코드", "가격"].map((h, ci) => S(colLetter(ci) + "1", h, 3)).join("") + `</row>`;
+    let r = 2;
+    Object.entries(stockPrices.prices).forEach(([c, p]) => { tb += `<row r="${r}">` + S("A" + r, c) + N("B" + r, p) + `</row>`; r++; });
+    if (stockPrices.usdkrw) { tb += `<row r="${r}">` + S("A" + r, "USDKRW") + N("B" + r, stockPrices.usdkrw) + `</row>`; r++; }
+    if (stockPrices.updated) { tb += `<row r="${r}">` + S("A" + r, "UPDATED") + S("B" + r, String(stockPrices.updated)) + `</row>`; r++; }
+    fileList.push([`xl/worksheets/sheet${idx}.xml`,
+      enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${tb}</sheetData></worksheet>`)]);
+    sheetRefs.push({ mon: "시세", idx });
+  }
+  if (regionTx.length) { // 지역카드 시트: 카드/날짜/구분/내용/금액
+    const idx = sheetRefs.length + 1;
+    let tb = `<row r="1">` + ["카드", "멤버", "날짜", "구분", "내용", "금액"].map((h, ci) => S(colLetter(ci) + "1", h, 3)).join("") + `</row>`;
+    regionTx.forEach((t, i) => {
+      const r = i + 2;
+      tb += `<row r="${r}">` + S("A" + r, t.card || "") + S("B" + r, t.who || "") + (t.date ? N("C" + r, dateToSerial(t.date), 1) : "") + S("D" + r, t.type || "사용") +
+        S("E" + r, t.title || "") + (t.amount ? N("F" + r, t.amount, 2) : "") + `</row>`;
+    });
+    fileList.push([`xl/worksheets/sheet${idx}.xml`, enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${tb}</sheetData></worksheet>`)]);
+    sheetRefs.push({ mon: "지역카드", idx });
+  }
+  if (estates.length) { // 부동산 시트: 이름/매입가/현재시세/메모
+    const idx = sheetRefs.length + 1;
+    let tb = `<row r="1">` + ["이름", "매입가", "현재시세", "메모"].map((h, ci) => S(colLetter(ci) + "1", h, 3)).join("") + `</row>`;
+    estates.forEach((e, i) => {
+      const r = i + 2;
+      tb += `<row r="${r}">` + S("A" + r, e.name || "") + (e.buy ? N("B" + r, e.buy) : "") + (e.now ? N("C" + r, e.now) : "") + S("D" + r, e.memo || "") + `</row>`;
+    });
+    fileList.push([`xl/worksheets/sheet${idx}.xml`, enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${tb}</sheetData></worksheet>`)]);
+    sheetRefs.push({ mon: "부동산", idx });
+  }
+  if (loans.length) { // 대출 시트: 이름/잔액/금리/월상환/메모
+    const idx = sheetRefs.length + 1;
+    let tb = `<row r="1">` + ["이름", "잔액", "금리", "월상환", "메모"].map((h, ci) => S(colLetter(ci) + "1", h, 3)).join("") + `</row>`;
+    loans.forEach((l, i) => {
+      const r = i + 2;
+      tb += `<row r="${r}">` + S("A" + r, l.name || "") + (l.balance ? N("B" + r, l.balance) : "") + (l.rate ? N("C" + r, l.rate) : "") + (l.monthly ? N("D" + r, l.monthly) : "") + S("E" + r, l.memo || "") + `</row>`;
+    });
+    fileList.push([`xl/worksheets/sheet${idx}.xml`, enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${tb}</sheetData></worksheet>`)]);
+    sheetRefs.push({ mon: "대출", idx });
+  }
+  if (pension.length) { // 퇴직연금 시트: 멤버/종류/종목명/코드/평단가/수량/평가금액
+    const idx = sheetRefs.length + 1;
+    let tb = `<row r="1">` + ["멤버", "종류", "종목명", "코드", "평단가", "수량", "평가금액"].map((h, ci) => S(colLetter(ci) + "1", h, 3)).join("") + `</row>`;
+    pension.forEach((p, i) => {
+      const r = i + 2;
+      tb += `<row r="${r}">` + S("A" + r, p.who || "") + S("B" + r, p.kind || "ETF") + S("C" + r, p.name || "") + S("D" + r, p.code || "") +
+        (p.avg ? N("E" + r, p.avg) : "") + (p.qty ? N("F" + r, p.qty) : "") + (p.amount ? N("G" + r, p.amount) : "") + `</row>`;
+    });
+    fileList.push([`xl/worksheets/sheet${idx}.xml`,
+      enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${tb}</sheetData></worksheet>`)]);
+    sheetRefs.push({ mon: "퇴직연금", idx });
+  }
+  if (savings.length) { // 적금 시트: 멤버/종류/금액/연이율/가입일/만료일/비과세
+    const idx = sheetRefs.length + 1;
+    let tb = `<row r="1">` + ["멤버", "종류", "금액", "연이율", "가입일", "만료일", "비과세"].map((h, ci) => S(colLetter(ci) + "1", h, 3)).join("") + `</row>`;
+    savings.forEach((s, i) => {
+      const r = i + 2;
+      tb += `<row r="${r}">` + S("A" + r, s.who || "") + S("B" + r, s.kind || "적금") + (s.amount ? N("C" + r, s.amount) : "") +
+        (s.rate ? N("D" + r, s.rate) : "") + S("E" + r, s.start || "") + S("F" + r, s.end || "") + S("G" + r, s.taxFree ? "Y" : "") + `</row>`;
+    });
+    fileList.push([`xl/worksheets/sheet${idx}.xml`,
+      enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${tb}</sheetData></worksheet>`)]);
+    sheetRefs.push({ mon: "적금", idx });
+  }
+  if (stocks.length) { // 주식 시트: 멤버/시장/코드/종목명/평단가/수량
+    const idx = sheetRefs.length + 1;
+    let tb = `<row r="1">` + ["멤버", "시장", "코드", "종목명", "평단가", "수량"].map((h, ci) => S(colLetter(ci) + "1", h, 3)).join("") + `</row>`;
+    stocks.forEach((s, i) => {
+      const r = i + 2;
+      tb += `<row r="${r}">` + S("A" + r, s.who || "") + S("B" + r, s.market || "KR") + S("C" + r, s.code || "") +
+        S("D" + r, s.name || "") + (s.avg ? N("E" + r, s.avg) : "") + (s.qty ? N("F" + r, s.qty) : "") + `</row>`;
+    });
+    fileList.push([`xl/worksheets/sheet${idx}.xml`,
+      enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${tb}</sheetData></worksheet>`)]);
+    sheetRefs.push({ mon: "주식", idx });
   }
 
   const ct = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
@@ -1248,13 +1443,12 @@ function render() {
   $("listView").classList.toggle("hidden", view !== "list");
   $("chartView").classList.toggle("hidden", view !== "chart");
   $("fixedView").classList.toggle("hidden", view !== "fixed");
-  document.querySelector(".toolbar").style.display = view === "fixed" ? "none" : ""; // 필터 줄은 모든 탭에서 월 아랫줄
-  $("stats").style.display = view === "fixed" ? "none" : ""; // 고정지출은 자체 카드(쩡이/슬구)만 사용
+  $("regionView").classList.toggle("hidden", view !== "region");
+  const noLedgerUI = view === "fixed" || view === "region"; // 고정지출·지역카드는 월 필터·카드 미사용
+  document.querySelector(".toolbar").style.display = noLedgerUI ? "none" : "";
+  $("stats").style.display = noLedgerUI ? "none" : "";
   document.querySelectorAll("#sideNav .side-item").forEach(b =>
     b.classList.toggle("active", b.dataset.view === view));
-  document.querySelectorAll("#typeFilterTabs .tab").forEach(b =>
-    b.classList.toggle("active", b.dataset.tf === typeFilter));
-  $("settleFilterTabs").style.display = view === "list" ? "" : "none";
   $("searchScope").style.display = view === "calendar" ? "none" : ""; // 달력은 항상 이 달이라 범위 선택 불필요
   const scopeCtrlOn = view !== "calendar" && view !== "fixed";
   $("rangeCtrl").style.display = scopeCtrlOn && searchScope === "range" ? "inline-flex" : "none";
@@ -1265,13 +1459,12 @@ function render() {
     $("yearCtrl").innerHTML = ys.map(y => `<option value="${y}"${y === scopeYear ? " selected" : ""}>${y}년</option>`).join("");
   }
   $("startDayBtn").style.display = view === "list" ? "" : "none"; // 시작일 버튼은 목록 탭에서만
-  document.querySelectorAll("#settleFilterTabs .tab").forEach(b =>
-    b.classList.toggle("active", b.dataset.sf === settleFilter));
   renderStats();
   if (view === "calendar") renderCalendar();
   else if (view === "list") renderList();
   else if (view === "chart") renderChart();
   else if (view === "fixed") renderFixed();
+  else if (view === "region") renderRegion();
   const total = entries.length;
   $("statusLeft").textContent = total ? `전체 ${total.toLocaleString()}건 기록` : "";
   if (typeof IS_MOBILE !== "undefined" && IS_MOBILE) mRender(); // 모바일 화면도 같이 갱신
@@ -1325,6 +1518,8 @@ function renderStats() {
     .filter(e => useCal ? e.date.startsWith(key) : (global ? inScopeEntry(e) : fymE(e) === key))
     .filter(e => !q || (e.title + " " + e.cat + " " + (e.who || "") + " " + (e.type === "exp" ? "지출" : "입금")).toLowerCase().includes(q))
     .filter(e => typeFilter === "all" || e.type === typeFilter); // 전체/지출/입금 필터도 카드에 반영
+  if (view === "list" && whoFilter) list = list.filter(e => e.who === whoFilter); // 누구 필터도 카드에 반영
+  if (view === "list" && catFilter) list = list.filter(e => e.cat === catFilter); // 카테고리 필터도 카드에 반영
   if (view === "list" && settleFilter !== "all") // 정산 필터도 카드에 반영
     list = list.filter(e => e.type === "exp" && (settleFilter === "done" ? e.settled : !e.settled));
   const incList = list.filter(e => e.type === "inc");
@@ -1350,6 +1545,13 @@ function renderStats() {
     <div class="stat"><div class="label">입금</div><div class="value inc">${inc ? "+" + fmtWon(inc) : "0원"}<small style="font-size:11px;color:var(--muted)"> · ${incList.length}건</small></div></div>
     <div class="stat"><div class="label">지출</div><div class="value exp">${exp ? "-" + fmtWon(exp) : "0원"}<small style="font-size:11px;color:var(--muted)"> · ${expList.length}건</small></div></div>
     <div class="stat"><div class="label">남은 금액</div><div class="value ${remain == null ? "" : remain >= 0 ? "inc" : "exp"}">${remain != null ? fmtWon(remain) : "-"}</div></div>`;
+  if (useCal) { // 달력 탭: 그 달의 고정지출 합계 (월 고정 + 납부일이 그 달인 년 고정)
+    const fxMonSum = fixedItems.filter(i => normFxPeriod(i.period || "월") === "월").reduce((a, i) => a + fxAmt(i, key), 0);
+    const fxYrSum = fixedItems.filter(i => normFxPeriod(i.period || "월") === "년" && i.year === +key.slice(0, 4) && (i.date || "").slice(0, 7) === key)
+      .reduce((a, i) => a + (i.amt || 0), 0);
+    $("stats").insertAdjacentHTML("beforeend",
+      `<div class="stat"><div class="label">고정지출 (월+년)</div><div class="value exp">${fmtWon(fxMonSum + fxYrSum)}</div></div>`);
+  }
   $("budgetTile").addEventListener("click", async () => {
     if (!httpMode && !ghActive() && fsMode && !fileHandle) { toast("파일 연결 중이에요 — 잠시 후 다시 시도해주세요"); return; }
     const cur = budgets[ym(curMonth)];
@@ -1442,6 +1644,7 @@ function renderCalDetail(byDay) {
   $("calDetail").classList.remove("hidden");
   bindRowActions($("calDetail"));
   $("calAddBtn").addEventListener("click", () => {
+    if (document.querySelector('.edit-row:not([data-eid=""])')) render(); // 수정 중이던 행은 원래대로 복귀 (한 번에 하나만)
     if ($("calDetailBody").querySelector('.edit-row[data-eid=""]')) return; // 이미 입력 중
     const emptyNote = $("calDetail").querySelector(".empty");
     if (emptyNote) emptyNote.remove();
@@ -1459,6 +1662,7 @@ function rowHtml(e, withDate = true, withCheck = false) {
     ${withDate ? `<td>${e.date.slice(5)}</td>` : `<td></td>`}
     <td><span class="badge ${e.type === "exp" ? "e" : "i"}">${e.type === "exp" ? "지출" : "입금"}</span></td>
     <td class="cat-tag">${esc(e.who || "-")}</td>
+    <td class="cat-tag">${esc(e.cat || "-")}</td>
     <td class="title-cell" title="${esc(e.title || e.cat)}">${esc(e.title || e.cat || "-")}</td>
     <td class="amt ${e.type === "exp" ? "e" : "i"}">${e.type === "exp" ? "-" : "+"}${e.amount.toLocaleString()}</td>
     ${withCheck ? (e.type === "exp"
@@ -1503,18 +1707,37 @@ function catOptions(type, cur) {
   if (cur && !list.includes(cur)) list.push(cur);
   return list.map(c => `<option${c === cur ? " selected" : ""}>${esc(c)}</option>`).join("");
 }
+function bindAmountInput(inp) { // 금액칸 콤마 자동 표기 — 중간 수정 시에도 커서 위치 유지
+  inp.addEventListener("input", () => {
+    const prev = inp.value;
+    const caret = inp.selectionStart ?? prev.length;
+    const digitsBefore = prev.slice(0, caret).replace(/[^\d]/g, "").length;
+    const raw = prev.replace(/[^\d]/g, "");
+    const next = raw ? Number(raw).toLocaleString("ko-KR") : "";
+    if (inp.value !== next) inp.value = next;
+    let pos = 0, cnt = 0;
+    while (pos < next.length && cnt < digitsBefore) { if (/\d/.test(next[pos])) cnt++; pos++; }
+    try { inp.setSelectionRange(pos, pos); } catch (e) {}
+  });
+}
+function lastWho() { // 새 항목의 누구 기본값 — 가장 최근 추가한 항목을 따라가고, 없으면 쩡이
+  let w = "쩡이", best = -1;
+  entries.forEach(e => { if ((e.seq || 0) > best && e.who) { best = e.seq || 0; w = e.who; } });
+  return w;
+}
 function editorRowHtml(e, withDate = true, editableDate = false, withCheck = false) {
   const type = e.type || "exp";
-  const whos = ["슬구", "쩡이"];
+  const whos = ["슬구", "쩡이", "현금"];
   if (e.who && !whos.includes(e.who)) whos.push(e.who);
+  const whoSel = e.who || lastWho();
   return `<tr class="edit-row" data-eid="${e.id || ""}" data-date="${e.date}">
-    <td>${editableDate ? `<input type="text" class="er-date" inputmode="numeric" value="${e.date}" placeholder="260908, 9/8" style="width:110px">` : (withDate ? e.date.slice(5) : "")}</td>
+    <td>${editableDate ? `<input type="text" class="er-date" inputmode="numeric" value="${e.date}" placeholder="260908" style="width:100%;box-sizing:border-box">` : (withDate ? e.date.slice(5) : "")}</td>
     <td><select class="er-type">
       <option value="exp"${type === "exp" ? " selected" : ""}>지출</option>
       <option value="inc"${type === "inc" ? " selected" : ""}>입금</option></select></td>
-    <td><select class="er-who">${whos.map(w => `<option${(e.who || "슬구") === w ? " selected" : ""}>${esc(w)}</option>`).join("")}</select></td>
-    <td><select class="er-cat">${catOptions(type, e.cat)}</select>
-        <input class="er-title" type="text" value="${esc(e.title || "")}" placeholder="내용"></td>
+    <td><select class="er-who">${whos.map(w => `<option${whoSel === w ? " selected" : ""}>${esc(w)}</option>`).join("")}</select></td>
+    <td><select class="er-cat">${catOptions(type, e.cat)}</select></td>
+    <td><input class="er-title" type="text" value="${esc(e.title || "")}" placeholder="내용"></td>
     <td class="amt"><input class="er-amt" type="text" inputmode="numeric" value="${e.amount ? e.amount.toLocaleString() : ""}" placeholder="금액"></td>
     ${withCheck ? `<td class="chk-col"></td>` : ""}
     <td><div class="er-act">
@@ -1526,10 +1749,7 @@ function bindEditorRow(tr) {
   const typeSel = tr.querySelector(".er-type");
   typeSel.addEventListener("change", () => { tr.querySelector(".er-cat").innerHTML = catOptions(typeSel.value, null); });
   const amtInp = tr.querySelector(".er-amt");
-  amtInp.addEventListener("input", () => {
-    const raw = amtInp.value.replace(/[^\d]/g, "");
-    amtInp.value = raw ? Number(raw).toLocaleString("ko-KR") : "";
-  });
+  bindAmountInput(amtInp);
   const saveFn = () => {
     const amount = parseAmount(amtInp.value);
     if (!amount) { toast("금액을 입력하세요"); amtInp.focus(); return; }
@@ -1566,7 +1786,8 @@ function bindEditorRow(tr) {
   tr.querySelector(".er-save").addEventListener("click", saveFn);
   tr.querySelector(".er-cancel").addEventListener("click", () => render());
   tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
-  tr.querySelector(".er-title").focus();
+  if (tr.dataset.eid) { amtInp.focus(); amtInp.select(); } // 수정(더블클릭)은 금액부터
+  else tr.querySelector(".er-title").focus();
 }
 
 function bindRowActions(root) {
@@ -1581,11 +1802,18 @@ function bindRowActions(root) {
     tr.querySelector(".edit")?.addEventListener("click", () => {
       const e = entries.find(x => x.id === id);
       if (!e) return;
-      const inList = !!tr.closest("#listBody");
+      const cont = tr.closest("#listBody, #calDetail, #dailyDetail");
+      let cur = tr;
+      if (document.querySelector(".edit-row")) { // 한 번에 하나만: 열려 있던 편집 줄은 원래대로 복귀
+        render();
+        cur = (cont || document).querySelector(`tr[data-id="${id}"]`);
+        if (!cur) return;
+      }
+      const inList = !!cur.closest("#listBody");
       const temp = document.createElement("tbody");
       temp.innerHTML = editorRowHtml(e, inList, false, true);
       const er = temp.firstElementChild;
-      tr.replaceWith(er);
+      cur.replaceWith(er);
       bindEditorRow(er);
     });
     const chk = tr.querySelector(".rowchk");
@@ -1599,6 +1827,10 @@ function bindRowActions(root) {
       save();
       updateChkAll();
     });
+    tr.addEventListener("dblclick", (ev) => { // 행 더블클릭 = 수정 (체크박스 클릭은 제외)
+      if (ev.target.closest("input,button,label")) return;
+      tr.querySelector(".edit")?.click();
+    });
     tr.addEventListener("dragstart", (ev) => {
       ev.dataTransfer.setData("text/plain", id);
       ev.dataTransfer.effectAllowed = "move";
@@ -1609,7 +1841,20 @@ function bindRowActions(root) {
 }
 
 function renderList() {
+  // 헤더 필터 셀렉트 채우기 (현재 상태 유지)
+  $("lsTypeSel").innerHTML = [["all", "구분"], ["exp", "지출"], ["inc", "입금"]]
+    .map(([v, t]) => `<option value="${v}"${typeFilter === v ? " selected" : ""}>${t}</option>`).join("");
+  const whos = [...new Set(["슬구", "쩡이", "현금"].concat(entries.map(e => e.who).filter(Boolean)))];
+  $("lsWhoSel").innerHTML = `<option value="">멤버</option>` +
+    whos.map(w => `<option value="${esc(w)}"${whoFilter === w ? " selected" : ""}>${esc(w)}</option>`).join("");
+  const lcats = [...new Set(DEFAULT_CATS.exp.concat(DEFAULT_CATS.inc).concat(entries.map(e => e.cat).filter(Boolean)))];
+  $("lsCatSel").innerHTML = `<option value="">카테고리</option>` +
+    lcats.map(c => `<option value="${esc(c)}"${catFilter === c ? " selected" : ""}>${esc(c)}</option>`).join("");
+  $("lsSettleSel").innerHTML = [["all", "정산"], ["undone", "미정산"], ["done", "정산완료"]]
+    .map(([v, t]) => `<option value="${v}"${settleFilter === v ? " selected" : ""}>${t}</option>`).join("");
   let list = monthEntries();
+  if (whoFilter) list = list.filter(e => e.who === whoFilter);
+  if (catFilter) list = list.filter(e => e.cat === catFilter);
   if (settleFilter !== "all")
     list = list.filter(e => e.type === "exp" && (settleFilter === "done" ? e.settled : !e.settled));
   // 헤더 정렬
@@ -1617,6 +1862,7 @@ function renderList() {
     date: (a, b) => a.date.localeCompare(b.date) || ((a.seq || 0) - (b.seq || 0)),
     type: (a, b) => a.type.localeCompare(b.type),
     who: (a, b) => (a.who || "").localeCompare(b.who || "", "ko"),
+    cat: (a, b) => (a.cat || "").localeCompare(b.cat || "", "ko"),
     title: (a, b) => (a.title || "").localeCompare(b.title || "", "ko"),
     amount: (a, b) => (a.amount || 0) - (b.amount || 0)
   };
@@ -1625,21 +1871,26 @@ function renderList() {
   document.querySelectorAll("#listView th.sortable").forEach(th => {
     th.textContent = th.dataset.label + (th.dataset.sort === listSort.key ? (listSort.dir > 0 ? " ▲" : " ▼") : "");
   });
-  const useDaySep = listSort.key === "date"; // 날짜 정렬일 때만 날짜 구분줄
+  document.querySelectorAll("#listView .sort-btn[data-lsk]").forEach(b => {
+    const on = listSort.key === b.dataset.lsk;
+    b.textContent = on ? (listSort.dir > 0 ? "▲" : "▼") : "↕";
+    b.classList.toggle("on", on);
+  });
+  const useDaySep = listSort.key === "date"; // 정렬 중에는 날짜 구분줄 없이 전체 기준 정렬
   const q = $("searchInput").value.trim();
   if (!list.length) {
-    $("listBody").innerHTML = `<tr><td colspan="7"><div class="empty">${q ? `"${q}" 검색 결과가 없습니다 (${searchScope === "all" ? "전체 기간" : "이 달"})` : "이 달에 기록이 없습니다"}</div></td></tr>`;
+    $("listBody").innerHTML = `<tr><td colspan="8"><div class="empty">${q ? `"${q}" 검색 결과가 없습니다 (${searchScope === "all" ? "전체 기간" : "이 달"})` : "이 달에 기록이 없습니다"}</div></td></tr>`;
     updateChkAll();
     return;
   }
   let html = "", lastDate = null;
   if (q || searchScope === "all") {
-    html += `<tr class="day-sep"><td colspan="7">${q ? `🔍 "${q}" ` : "📄 "}${searchScope === "all" ? "전체 기간" : "이 달"}${settleFilter === "done" ? " · 정산완료" : settleFilter === "undone" ? " · 미정산" : ""} — ${list.length}건</td></tr>`;
+    html += `<tr class="day-sep"><td colspan="8">${q ? `🔍 "${q}" ` : "📄 "}${searchScope === "all" ? "전체 기간" : "이 달"}${settleFilter === "done" ? " · 정산완료" : settleFilter === "undone" ? " · 미정산" : ""} — ${list.length}건</td></tr>`;
   }
   list.forEach(e => {
     if (useDaySep && e.date !== lastDate) {
       const dow = ["일","월","화","수","목","금","토"][new Date(+e.date.slice(0,4), +e.date.slice(5,7)-1, +e.date.slice(8,10)).getDay()];
-      html += `<tr class="day-sep" data-day="${e.date}"><td colspan="7">${e.date} (${dow})</td></tr>`;
+      html += `<tr class="day-sep" data-day="${e.date}"><td colspan="8">${e.date} (${dow})</td></tr>`;
       lastDate = e.date;
     }
     html += rowHtml(e, true, true);
@@ -1706,6 +1957,72 @@ function renderChart() {
   renderDailyChart(monthEntries(true), typeFilter);
   renderTrendChart();
   renderFixedStats();
+  renderEatOutStats();
+  renderWhoStats();
+}
+
+/* 통계: 누구별 지출·입금 (기간·검색 조건 연동) */
+function renderWhoStats() {
+  const list = monthEntries(true);
+  const by = {};
+  list.forEach(e => {
+    const w = e.who || "미지정";
+    by[w] = by[w] || { exp: 0, inc: 0 };
+    by[w][e.type] += e.amount;
+  });
+  const rows = Object.entries(by).sort((a, b) => (b[1].exp + b[1].inc) - (a[1].exp + a[1].inc));
+  const mx = Math.max(...rows.flatMap(([, v]) => [v.exp, v.inc]), 1);
+  $("whoStatSub").textContent = rows.length ? "" : "";
+  $("whoStatChart").innerHTML = rows.length ? rows.map(([w, v]) => `
+    <div class="mbar">
+      <div class="bl"><span style="font-weight:700">${esc(w)}</span>
+        <b><span style="color:var(--exp)">-${v.exp.toLocaleString()}</span> · <span style="color:var(--inc)">+${v.inc.toLocaleString()}</span></b></div>
+      <div class="bt" style="margin-bottom:3px"><i style="width:${Math.round(v.exp / mx * 100)}%"></i></div>
+      <div class="bt"><i style="width:${Math.round(v.inc / mx * 100)}%;background:var(--chart-inc)"></i></div>
+    </div>`).join("") : `<div class="empty">이 기간 기록이 없어요</div>`;
+}
+
+/* 통계: 그 달 밖에서 쓴 식비 (외식·배달·카페 계열) 합계 + 월별 추이 */
+let eatShape = "donut"; // 외식 카드 표시 형태 (도넛형/막대형)
+function isEatOutCat(c) { return c === "외식" || c === "배달" || String(c || "").startsWith("카페"); }
+function renderEatOutStats() {
+  const key = ym(curMonth);
+  const cur = entries.filter(e => e.type === "exp" && isEatOutCat(e.cat) && fymE(e) === key);
+  const sum = cur.reduce((a, e) => a + e.amount, 0);
+  $("eatSub").textContent = `${+key.slice(5, 7)}월 · ${cur.length}건`;
+  $("eatBig").textContent = sum ? "-" + fmtWon(sum) : "0원";
+  const parts = ["외식", "배달"].map(c => [c, cur.filter(e => e.cat === c).reduce((a, e) => a + e.amount, 0)]);
+  parts.push(["카페", cur.filter(e => String(e.cat).startsWith("카페")).reduce((a, e) => a + e.amount, 0)]);
+  const items = parts.filter(([, v]) => v > 0);
+  if (!items.length) $("eatChart").innerHTML = `<div class="empty" style="padding:14px">이 달 외식·배달·카페 지출이 없어요</div>`;
+  else if (eatShape === "donut") renderDonut(items, "eatChart");
+  else $("eatChart").innerHTML = items.map(([c, v]) =>
+    `<div class="mbar"><div class="bl"><span>${esc(c)}</span><b>-${v.toLocaleString()}</b></div>
+     <div class="bt"><i style="width:${Math.round(v / (items[0][1] || 1) * 100)}%"></i></div></div>`).join("");
+  // 월별 추이 (최근 12개월)
+  const months = [];
+  let m = monthKeyShift(key, -11);
+  for (let i = 0; i < 12; i++) { months.push(m); m = monthKeyShift(m, 1); }
+  const vals = months.map(k => entries.filter(e => e.type === "exp" && isEatOutCat(e.cat) && fymE(e) === k).reduce((a, e) => a + e.amount, 0));
+  const maxV = Math.max(...vals, 0);
+  $("eatMonthly").innerHTML = "";
+  const W = 1500, H = 170, padL = 8, padB = 22, padT = 12, plotH = H - padB - padT;
+  const slot = (W - padL * 2) / 12;
+  const svg = d3.select("#eatMonthly").append("svg").attr("viewBox", `0 0 ${W} ${H}`).style("width", "100%").style("height", "auto").style("display", "block");
+  months.forEach((k, i) => {
+    const cx = padL + i * slot + slot / 2, v = vals[i];
+    if (v > 0 && maxV > 0) {
+      const h = Math.max(plotH * v / maxV, 3);
+      svg.append("rect").attr("x", cx - slot * 0.2).attr("width", slot * 0.4).attr("rx", 3)
+        .attr("y", padT + plotH - h).attr("height", h).attr("fill", "var(--chart-exp)");
+    }
+    svg.append("text").attr("x", cx).attr("y", H - 6).attr("font-size", 10.5)
+      .attr("fill", k === key ? "var(--accent)" : "var(--muted)").attr("font-weight", k === key ? 700 : 400)
+      .attr("text-anchor", "middle").text(`${+k.slice(5)}월`);
+    svg.append("rect").attr("x", padL + i * slot).attr("y", 0).attr("width", slot).attr("height", H).attr("fill", "transparent")
+      .attr("data-tip", `<b>${k.slice(0, 4)}년 ${+k.slice(5)}월</b><br>외식·배달·카페 ${fmtWon(vals[i])}`);
+  });
+  bindHoverTips($("eatMonthly"));
 }
 
 /* 통계 탭의 고정지출 섹션: 이번 달 대분류별 도넛 + 월별 합계 추이 */
@@ -2258,7 +2575,7 @@ function rowsToEntries(rows, ctx) {
       cType = findCol(h, ["구분", "유형", "타입", "type", "수입/지출"]);
       cSettled = findCol(h, ["정산"]);
       cCat = findCol(h, ["카테고리", "category", "항목"]);
-      cWho = findCol(h, ["누구", "사람", "결제자", "입금자", "대분류"]);
+      cWho = findCol(h, ["멤버", "누구", "사람", "결제자", "입금자", "대분류"]);
       cTitle = findCol(h, ["내용", "내역", "사용처", "적요", "title", "가맹점"]);
       break;
     }
@@ -2321,6 +2638,12 @@ async function fileToEntries(nameOrFile, buf) {
   const foundFixed = [];
   const foundTvTrips = [];
   const foundTvItems = [];
+  const foundStocks = [];
+  const foundSavings = [];
+  const foundPension = [];
+  const foundEstates = [];
+  const foundLoans = [];
+  const foundRegionTx = [];
   let skipped = 0, badSheets = [];
   for (const s of sheetList) {
     // 여행 시트
@@ -2339,6 +2662,112 @@ async function fileToEntries(nameOrFile, buf) {
           end: normDate(r[base + 2]) || undefined,
           lat: Number.isFinite(lat) && String(r[base + 3] ?? "") !== "" ? lat : undefined,
           lng: Number.isFinite(lng) && String(r[base + 4] ?? "") !== "" ? lng : undefined
+        });
+      }
+      continue;
+    }
+    if (s.name.trim() === "시세") { // 시세 스냅샷 — GitHub prices.json이 오면 그걸로 덮임
+      const snap = { prices: {}, usdkrw: null, updated: null };
+      for (const r of s.rows.slice(1)) {
+        const k = String(r[0] ?? "").trim();
+        if (!k) continue;
+        if (k === "USDKRW") snap.usdkrw = Number(r[1]) || null;
+        else if (k === "UPDATED") snap.updated = String(r[1] ?? "");
+        else { const p = Number(String(r[1] ?? "").replace(/,/g, "")); if (p > 0) snap.prices[k] = p; }
+      }
+      if (Object.keys(snap.prices).length && !(stockPrices.updated && stockPrices.updated > (snap.updated || ""))) stockPrices = snap;
+      continue;
+    }
+    if (s.name.trim() === "지역카드") {
+      const h = (s.rows[0] || []).map(x => String(x));
+      const c = (kw) => h.findIndex(x => x.includes(kw));
+      const cC = c("카드"), cW = c("멤버"), cD = c("날짜"), cT = c("구분"), cN = c("내용"), cA = c("금액");
+      for (const r of s.rows.slice(1)) {
+        const card = cC >= 0 ? String(r[cC] ?? "").trim() : "";
+        const amt = cA >= 0 ? Number(String(r[cA] ?? "").replace(/[,원\s]/g, "")) || 0 : 0;
+        if (!card && !amt) continue;
+        foundRegionTx.push({ id: uid() + foundRegionTx.length, card, who: cW >= 0 ? String(r[cW] ?? "").trim() : "", date: cD >= 0 ? normDate(r[cD]) || "" : "", type: cT >= 0 && /충전/.test(String(r[cT])) ? "충전" : "사용", title: cN >= 0 ? String(r[cN] ?? "").trim() : "", amount: amt });
+      }
+      continue;
+    }
+    if (s.name.trim() === "부동산") {
+      const h = (s.rows[0] || []).map(x => String(x));
+      const c = (kw) => h.findIndex(x => x.includes(kw));
+      const cN = c("이름"), cB = c("매입"), cW = c("현재") >= 0 ? c("현재") : c("시세"), cM = c("메모");
+      const num = (v) => Number(String(v ?? "").replace(/[,원\s]/g, "")) || 0;
+      for (const r of s.rows.slice(1)) {
+        const name = cN >= 0 ? String(r[cN] ?? "").trim() : "";
+        if (!name) continue;
+        foundEstates.push({ id: uid() + foundEstates.length, name, buy: num(cB >= 0 ? r[cB] : 0), now: num(cW >= 0 ? r[cW] : 0), memo: cM >= 0 ? String(r[cM] ?? "").trim() : "" });
+      }
+      continue;
+    }
+    if (s.name.trim() === "대출") {
+      const h = (s.rows[0] || []).map(x => String(x));
+      const c = (kw) => h.findIndex(x => x.includes(kw));
+      const cN = c("이름"), cB = c("잔액"), cR = c("금리"), cMo = c("월상환"), cM = c("메모");
+      const num = (v) => Number(String(v ?? "").replace(/[,원%\s]/g, "")) || 0;
+      for (const r of s.rows.slice(1)) {
+        const name = cN >= 0 ? String(r[cN] ?? "").trim() : "";
+        if (!name) continue;
+        foundLoans.push({ id: uid() + foundLoans.length, name, balance: num(cB >= 0 ? r[cB] : 0), rate: num(cR >= 0 ? r[cR] : 0), monthly: num(cMo >= 0 ? r[cMo] : 0), memo: cM >= 0 ? String(r[cM] ?? "").trim() : "" });
+      }
+      continue;
+    }
+    if (s.name.trim() === "퇴직연금") {
+      const h = (s.rows[0] || []).map(x => String(x));
+      const c = (kw) => h.findIndex(x => x.includes(kw));
+      const cW = c("멤버") >= 0 ? c("멤버") : c("누구"), cK = c("종류"), cN = c("종목"), cC = c("코드"), cA = c("평단"), cQ = c("수량"), cV = c("평가");
+      for (const r of s.rows.slice(1)) {
+        const kind = cK >= 0 ? String(r[cK] ?? "").trim() : "";
+        const name = cN >= 0 ? String(r[cN] ?? "").trim() : "";
+        if (!kind && !name) continue;
+        const num = (v) => Number(String(v ?? "").replace(/[,원$\s]/g, "")) || 0;
+        foundPension.push({
+          id: uid() + foundPension.length,
+          who: cW >= 0 ? String(r[cW] ?? "").trim() : "",
+          kind: /ETF/i.test(kind) ? "ETF" : /채권/.test(kind) ? "채권" : "예금",
+          name, code: cC >= 0 ? String(r[cC] ?? "").trim().toUpperCase() : "",
+          avg: num(cA >= 0 ? r[cA] : 0), qty: num(cQ >= 0 ? r[cQ] : 0), amount: num(cV >= 0 ? r[cV] : 0)
+        });
+      }
+      continue;
+    }
+    if (s.name.trim() === "적금") {
+      const h = (s.rows[0] || []).map(x => String(x));
+      const c = (kw) => h.findIndex(x => x.includes(kw));
+      const cW = c("멤버") >= 0 ? c("멤버") : c("누구"), cK = c("종류"), cA = c("금액"), cR = c("연이율") >= 0 ? c("연이율") : c("이율"), cS = c("가입"), cE = c("만료") >= 0 ? c("만료") : c("만기"), cF = c("비과세");
+      for (const r of s.rows.slice(1)) {
+        const kind = cK >= 0 ? String(r[cK] ?? "").trim() : "";
+        const amt = cA >= 0 ? Number(String(r[cA] ?? "").replace(/[,원\s]/g, "")) || 0 : 0;
+        if (!amt && !kind) continue;
+        foundSavings.push({
+          id: uid() + foundSavings.length,
+          who: cW >= 0 ? String(r[cW] ?? "").trim() : "",
+          kind: /예금/.test(kind) ? "예금" : "적금",
+          amount: amt,
+          rate: cR >= 0 ? Number(String(r[cR] ?? "").replace(/[%\s]/g, "")) || 0 : 0,
+          start: cS >= 0 ? normDate(r[cS]) || "" : "",
+          end: cE >= 0 ? normDate(r[cE]) || "" : "",
+          taxFree: cF >= 0 && /Y|비과세|1|true/i.test(String(r[cF] ?? ""))
+        });
+      }
+      continue;
+    }
+    if (s.name.trim() === "주식") {
+      const h = (s.rows[0] || []).map(x => String(x));
+      const c = (kw) => h.findIndex(x => x.includes(kw));
+      const cW = c("멤버") >= 0 ? c("멤버") : c("누구"), cM = c("시장"), cC = c("코드"), cN = c("종목"), cA = c("평단"), cQ = c("수량");
+      for (const r of s.rows.slice(1)) {
+        const code = cC >= 0 ? String(r[cC] ?? "").trim() : "";
+        const name = cN >= 0 ? String(r[cN] ?? "").trim() : "";
+        if (!code && !name) continue;
+        const num = (v) => Number(String(v ?? "").replace(/[,원$\s]/g, "")) || 0;
+        foundStocks.push({
+          id: uid() + foundStocks.length,
+          who: cW >= 0 ? String(r[cW] ?? "").trim() : "",
+          market: cM >= 0 && /US|미국/i.test(String(r[cM])) ? "US" : "KR",
+          code, name, avg: num(cA >= 0 ? r[cA] : 0), qty: num(cQ >= 0 ? r[cQ] : 0)
         });
       }
       continue;
@@ -2371,7 +2800,7 @@ async function fileToEntries(nameOrFile, buf) {
         const cS = h.findIndex(x => x.includes("슬"));
         const cPer = h.findIndex(x => x.includes("주기"));
         const cYr = h.findIndex(x => x.includes("연도"));
-        const cWho = h.findIndex(x => x.includes("누구"));
+        const cWho = h.findIndex(x => x.includes("멤버") || x.includes("누구"));
         const cAmt = h.findIndex(x => x === "금액" || (x.includes("금액") && !x.includes("월별")));
         const cPin = h.findIndex(x => x.includes("고정핀"));
         const cHist = h.findIndex(x => x.includes("월별금액"));
@@ -2470,13 +2899,13 @@ async function fileToEntries(nameOrFile, buf) {
     const monthly = foundFixed.filter(i => normFxPeriod(i.period || "월") === "월");
     if (monthly.length && monthly.every(i => i.pin === true)) monthly.forEach(i => delete i.pin);
   }
-  return { all, skipped, badSheets, budgets: foundBudgets, starts: foundStarts, fixed: foundFixed, tvTrips: foundTvTrips, tvItems: foundTvItems, legacy: monthSheets.length > 0 };
+  return { all, skipped, badSheets, budgets: foundBudgets, starts: foundStarts, fixed: foundFixed, tvTrips: foundTvTrips, tvItems: foundTvItems, stocks: foundStocks, savings: foundSavings, pension: foundPension, estates: foundEstates, loans: foundLoans, regionTx: foundRegionTx, legacy: monthSheets.length > 0 };
 }
 
 async function importFile(file) {
   try {
     const buf = await file.arrayBuffer();
-    const { all: imported, skipped, budgets: importedBudgets, starts: importedStarts, fixed: importedFixed, tvTrips: importedTvT, tvItems: importedTvI } = await fileToEntries(file.name, buf);
+    const { all: imported, skipped, budgets: importedBudgets, starts: importedStarts, fixed: importedFixed, tvTrips: importedTvT, tvItems: importedTvI, stocks: importedStk, savings: importedSav, pension: importedPen, estates: importedEst, loans: importedLo, regionTx: importedRtx } = await fileToEntries(file.name, buf);
     if (!imported.length) throw new Error("가져올 수 있는 행이 없습니다 (날짜/금액 컬럼 확인)");
 
     const merge = entries.length === 0 ||
@@ -2501,6 +2930,12 @@ async function importFile(file) {
     }
     if (importedFixed && importedFixed.length) fixedItems = importedFixed; // 고정지출 시트가 있으면 교체
     if (importedTvT && importedTvT.length) { travelTrips = importedTvT; travelItems = importedTvI || []; }
+    if (importedStk && importedStk.length) stocks = importedStk;
+    if (importedSav && importedSav.length) savings = importedSav;
+    if (importedPen && importedPen.length) pension = importedPen;
+    if (importedEst && importedEst.length) estates = importedEst;
+    if (importedLo && importedLo.length) loans = importedLo;
+    if (importedRtx && importedRtx.length) regionTx = importedRtx;
     if (importedStarts) { for (const k of Object.keys(importedStarts)) { if (!monthStarts[k]) monthStarts[k] = importedStarts[k]; } }
     save();
     const latest = entries.reduce((a, e) => e.date > a ? e.date : a, "0000");
@@ -2515,7 +2950,7 @@ async function importFile(file) {
 /* ═══════════ 내보내기 (CSV, 엑셀 호환) ═══════════ */
 function exportCsv() {
   if (!entries.length) { toast("내보낼 데이터가 없습니다"); return; }
-  const lines = ["날짜,구분,누구,카테고리,내용,금액"];
+  const lines = ["날짜,구분,멤버,카테고리,내용,금액"];
   [...entries].sort((a, b) => a.date.localeCompare(b.date)).forEach(e => {
     const q = (s) => `"${String(s).replace(/"/g, '""')}"`;
     lines.push([e.date, e.type === "exp" ? "지출" : "입금", q(e.who || ""), q(e.cat), q(e.title), e.amount].join(","));
@@ -2611,6 +3046,7 @@ let fxYear = new Date().getFullYear(); // 년 고정지출은 연도별로 따�
 let fxCatFilter = ""; // 대분류 헤더 필터
 let fxWhoFilter = ""; // 누구 헤더 필터 (월 탭: 전체/쩡이/슬구)
 let fxSort = null; // 고정지출 헤더 정렬 {key, dir} — null이면 기본 대분류 그룹 정렬
+let fxSettleFilter = ""; // 정산 헤더 필터 (""=전체/done/undone)
 /* 월 고정지출 금액은 월별 이력(amts{"YYYY-MM":값})으로 저장 — 입력은 그 달에만 유효(다음 달은 빈칸),
    📌 고정(pin=true)한 항목만 마지막 값이 다음 달로 자동으로 이어짐. 과거 달 값은 확정 보존. */
 function fxCurYM() { return ym(new Date()); }
@@ -2704,16 +3140,19 @@ function renderFixed() {
   const sel = $("fxCatFilterSel");
   const cats = [...new Set(itemsAll.map(i => i.cat).filter(Boolean))];
   if (fxCatFilter && !cats.includes(fxCatFilter)) fxCatFilter = "";
-  sel.innerHTML = `<option value="">대분류: 전체</option>` + cats.map(c => `<option value="${esc(c)}"${c === fxCatFilter ? " selected" : ""}>${esc(c)}</option>`).join("");
+  sel.innerHTML = `<option value="">대분류</option>` + cats.map(c => `<option value="${esc(c)}"${c === fxCatFilter ? " selected" : ""}>${esc(c)}</option>`).join("");
   // 누구/납부자 헤더 필터 (월: 쩡이·슬구 / 년: 쩡이·슬구·현금)
   const whoOpts = fxPeriod === "년"
-    ? [["", "납부자: 전체"], ["쩡이", "쩡이"], ["슬구", "슬구"], ["현금", "현금"]]
-    : [["", "누구: 전체"], ["쩡이", "쩡이"], ["슬구", "슬구"]];
+    ? [["", "납부자"], ["쩡이", "쩡이"], ["슬구", "슬구"], ["현금", "현금"]]
+    : [["", "멤버"], ["쩡이", "쩡이"], ["슬구", "슬구"]];
   $("fxWhoFilterSel").innerHTML = whoOpts
     .map(([v, t]) => `<option value="${v}"${fxWhoFilter === v ? " selected" : ""}>${t}</option>`).join("");
+  $("fxSettleFilterSel").innerHTML = [["", "정산"], ["done", "완료"], ["undone", "미완료"]]
+    .map(([v, t]) => `<option value="${v}"${fxSettleFilter === v ? " selected" : ""}>${t}</option>`).join("");
   const items = itemsAll
     .filter(i => !fxCatFilter || i.cat === fxCatFilter)
-    .filter(i => !fxWhoFilter || i.who === fxWhoFilter);
+    .filter(i => !fxWhoFilter || i.who === fxWhoFilter)
+    .filter(i => !fxSettleFilter || (fxSettleFilter === "done" ? fxSettled(i) : !fxSettled(i)));
   // 대분류별로 묶고 → 그 안에서 소분류 이름순 정렬 (같은 이름끼리 붙게: 핸드폰/쩡이·핸드폰/슬구)
   const catOrder = {};
   fixedItems.forEach((i2, idx) => { const c = i2.cat || "￿"; if (catOrder[c] === undefined) catOrder[c] = idx; });
@@ -2769,7 +3208,8 @@ function renderFixed() {
   bindFxRows();
 }
 document.querySelectorAll("#fxTabs .tab").forEach(b =>
-  b.addEventListener("click", () => { fxPeriod = b.dataset.fp; fxCatFilter = ""; fxWhoFilter = ""; fxSort = null; fxMonth = fxCurYM(); render(); }));
+  b.addEventListener("click", () => { fxPeriod = b.dataset.fp; fxCatFilter = ""; fxWhoFilter = ""; fxSettleFilter = ""; fxSort = null; fxMonth = fxCurYM(); saveUiState(); render(); }));
+$("fxSettleFilterSel").addEventListener("change", () => { fxSettleFilter = $("fxSettleFilterSel").value; renderFixed(); });
 document.querySelectorAll("#fixedView [data-fxsort]").forEach(el =>
   el.addEventListener("click", () => {
     const k = el.dataset.fxsort;
@@ -2804,10 +3244,7 @@ function fxEditorHtml(it) {
     <td><div class="er-act"><button class="er-save" title="저장">✓</button><button class="er-cancel" title="취소">✕</button></div></td></tr>`;
 }
 function bindFxEditor(tr) {
-  tr.querySelectorAll(".fx-j, .fx-s").forEach(inp => inp.addEventListener("input", () => {
-    const raw = inp.value.replace(/[^\d]/g, "");
-    inp.value = raw ? Number(raw).toLocaleString("ko-KR") : "";
-  }));
+  tr.querySelectorAll(".fx-j, .fx-s").forEach(bindAmountInput);
   const saveFn = () => {
     if (!httpMode && !ghActive() && fsMode && !fileHandle) { toast("파일 연결 중이에요 — 잠시 후 다시 시도해주세요"); return; }
     const amtVal = parseAmount(tr.querySelector(".fx-j").value) || 0;
@@ -2848,7 +3285,8 @@ function bindFxEditor(tr) {
   tr.querySelector(".er-save").addEventListener("click", saveFn);
   tr.querySelector(".er-cancel").addEventListener("click", renderFixed);
   tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
-  tr.querySelector(".fx-cat").focus();
+  if (tr.dataset.fid) { const a = tr.querySelector(".fx-j"); a.focus(); a.select(); } // 수정(더블클릭)은 금액부터
+  else tr.querySelector(".fx-cat").focus();
 }
 function bindFxRows() {
   $("fxBody").querySelectorAll("tr[data-fid]").forEach(tr => {
@@ -2863,9 +3301,15 @@ function bindFxRows() {
     const openEdit = () => {
       const it = fixedItems.find(x => x.id === id);
       if (!it) return;
+      let cur = tr;
+      if ($("fxBody").querySelector(".edit-row")) { // 한 번에 하나만: 열려 있던 편집 줄은 원래대로 복귀
+        renderFixed();
+        cur = $("fxBody").querySelector(`tr[data-fid="${id}"]`);
+        if (!cur) return;
+      }
       const temp = document.createElement("tbody");
       temp.innerHTML = fxEditorHtml(it);
-      tr.replaceWith(temp.firstElementChild);
+      cur.replaceWith(temp.firstElementChild);
       bindFxEditor($("fxBody").querySelector(`.edit-row[data-fid="${id}"]`));
     };
     tr.querySelector(".edit")?.addEventListener("click", openEdit);
@@ -2903,6 +3347,7 @@ function bindFxRows() {
   });
 }
 $("fxAddBtn").addEventListener("click", () => {
+  if ($("fxBody").querySelector('.edit-row:not([data-fid=""])')) renderFixed(); // 수정 중이던 행은 원래대로 복귀
   if ($("fxBody").querySelector('.edit-row[data-fid=""]')) return;
   if ($("fxBody").querySelector(".empty")) $("fxBody").innerHTML = "";
   const temp = document.createElement("tbody");
@@ -2911,12 +3356,716 @@ $("fxAddBtn").addEventListener("click", () => {
   bindFxEditor($("fxBody").querySelector('.edit-row[data-fid=""]'));
 });
 
+/* ═══════════ 재테크 · 주식 (멤버별 수익률, 시세는 GitHub Actions가 장 마감 후 갱신) ═══════════ */
+function bindDecimalInput(inp) { // 콤마 자동 + 소수점 허용 (주식 평단가·수량용), 커서 유지
+  inp.addEventListener("input", () => {
+    const prev = inp.value;
+    const caret = inp.selectionStart ?? prev.length;
+    const unitsBefore = prev.slice(0, caret).replace(/[^\d.]/g, "").length;
+    let raw = prev.replace(/[^\d.]/g, "");
+    const fd = raw.indexOf(".");
+    if (fd >= 0) raw = raw.slice(0, fd + 1) + raw.slice(fd + 1).replace(/\./g, "");
+    const [ip = "", dp] = raw.split(".");
+    const next = (ip ? Number(ip).toLocaleString("ko-KR") : "") + (fd >= 0 ? "." + (dp || "") : "");
+    if (inp.value !== next) inp.value = next;
+    let pos = 0, cnt = 0;
+    while (pos < next.length && cnt < unitsBefore) { if (/[\d.]/.test(next[pos])) cnt++; pos++; }
+    try { inp.setSelectionRange(pos, pos); } catch (e) {}
+  });
+}
+function priceCodes() { // 시세를 받아야 할 코드 = 주식 + 퇴직연금 ETF (중복 제거)
+  const seen = new Set(), out = [];
+  stocks.forEach(s => { if (s.code && !seen.has(s.code)) { seen.add(s.code); out.push({ market: s.market, code: s.code }); } });
+  pension.forEach(p => { if (p.kind === "ETF" && p.code && !seen.has(p.code)) { seen.add(p.code); out.push({ market: p.market || "KR", code: p.code }); } });
+  return out;
+}
+function stkPrice(s) { const p = stockPrices && stockPrices.prices ? stockPrices.prices[s.code] : null; return (typeof p === "number" && p > 0) ? p : null; }
+function stkKrw(s, v) { if (v == null) return null; return s.market === "US" ? (stockPrices.usdkrw ? v * stockPrices.usdkrw : null) : v; }
+function renderStocks() {
+  const fmt = (n) => Math.round(n).toLocaleString("ko-KR");
+  const groups = {};
+  stocks.forEach(s => { const w = s.who || "기타"; (groups[w] = groups[w] || []).push(s); });
+  const order = ["쩡이", "슬구"].filter(w => groups[w]).concat(Object.keys(groups).filter(w => w !== "쩡이" && w !== "슬구"));
+  const calc = (list) => { // 원화 환산 합계 (시세·환율 없는 종목은 집계 제외)
+    let buy = 0, evalV = 0, counted = 0;
+    list.forEach(s => {
+      const p = stkPrice(s);
+      const b = stkKrw(s, s.avg * s.qty);
+      const ev = p != null ? stkKrw(s, p * s.qty) : null;
+      if (b != null && ev != null) { buy += b; evalV += ev; counted++; }
+    });
+    return { buy, evalV, counted, total: list.length };
+  };
+  const cardHtml = (label, c) => {
+    const profit = c.evalV - c.buy;
+    const rate = c.buy ? (profit / c.buy * 100) : 0;
+    const col = profit >= 0 ? "var(--exp)" : "var(--accent)"; // 수익=빨강, 손실=파랑 (국내 관례)
+    return `<div class="stat"><div class="label">${esc(label)}${c.counted < c.total ? ` <span style="color:var(--muted)">(시세 ${c.counted}/${c.total}종목)</span>` : ""}</div>
+      <div class="value" style="color:${col}">${c.buy ? (profit >= 0 ? "+" : "") + fmt(profit) + "원 (" + (rate >= 0 ? "+" : "") + rate.toFixed(1) + "%)" : "-"}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">매입 ${fmt(c.buy)} → 평가 ${fmt(c.evalV)}</div></div>`;
+  };
+  $("stkCards").innerHTML = stocks.length
+    ? order.map(w => cardHtml(w + " 주식", calc(groups[w]))).join("") + cardHtml("둘이 합산", calc(stocks))
+    : "";
+  if (!stocks.length) {
+    $("stkBody").innerHTML = `<tr><td colspan="10"><div class="empty">보유 주식이 없습니다 — ＋ 추가로 종목·평단가·수량을 입력하세요</div></td></tr>`;
+  } else {
+    let html = "";
+    order.forEach(w => {
+      const c = calc(groups[w]);
+      const pr = c.evalV - c.buy;
+      html += `<tr class="day-sep"><td colspan="10">${esc(w)} · ${groups[w].length}종목${c.buy ? ` · <b style="color:${pr >= 0 ? "var(--exp)" : "var(--accent)"}">${pr >= 0 ? "+" : ""}${fmt(pr)}원 (${(pr / c.buy * 100).toFixed(1)}%)</b>` : ""}</td></tr>`;
+      groups[w].forEach(s => { html += stkRowHtml(s); });
+    });
+    $("stkBody").innerHTML = html;
+    bindStkRows();
+  }
+  $("stkNote").textContent = ghActive()
+    ? (stockPrices.updated
+      ? `시세 갱신: ${String(stockPrices.updated).replace("T", " ").slice(0, 16)} (한국·미국장 마감 후 자동)` + (stockPrices.usdkrw ? ` · 환율 ${Number(stockPrices.usdkrw).toFixed(1)}원/$` : "")
+      : "시세 준비 중 — 장 마감 후 자동으로 채워져요 (종목 추가 후 다음 갱신부터)")
+    : (stockPrices.updated
+      ? `시세 기준: ${String(stockPrices.updated).replace("T", " ").slice(0, 16)} 저장분` + (stockPrices.usdkrw ? ` · 환율 ${Number(stockPrices.usdkrw).toFixed(1)}원/$` : "") + " — 자동 갱신은 웹 화면에서"
+      : "시세 자동 갱신은 웹(GitHub 연결) 화면에서 동작해요 — 여기서는 종목 입력만 가능");
+}
+function stkRowHtml(s) {
+  const p = stkPrice(s);
+  const cur = s.market === "US" ? "$" : "";
+  const f = (n) => n == null ? "-" : (s.market === "US" ? n.toLocaleString("en-US", { maximumFractionDigits: 2 }) : Math.round(n).toLocaleString());
+  const evalV = p != null ? p * s.qty : null;
+  const profit = p != null ? (p - s.avg) * s.qty : null;
+  const rate = p != null && s.avg ? (p - s.avg) / s.avg * 100 : null;
+  const col = profit == null ? "" : profit >= 0 ? "var(--exp)" : "var(--accent)";
+  return `<tr data-sid="${s.id}" title="더블클릭으로 수정">
+    <td class="cat-tag">${esc(s.who || "-")}</td>
+    <td style="font-weight:600">${esc(s.name || "-")}</td>
+    <td class="cat-tag">${s.market === "US" ? "미국" : "한국"} · ${esc(s.code)}</td>
+    <td class="amt">${(s.qty || 0).toLocaleString()}</td>
+    <td class="amt">${cur}${f(s.avg)}</td>
+    <td class="amt">${p == null ? `<span style="color:var(--muted);font-size:11px">시세 대기</span>` : cur + f(p)}</td>
+    <td class="amt">${evalV == null ? "-" : cur + f(evalV)}</td>
+    <td class="amt" style="color:${col}">${profit == null ? "-" : (profit >= 0 ? "+" : "") + cur + f(profit)}</td>
+    <td class="amt" style="color:${col};font-weight:700">${rate == null ? "-" : (rate >= 0 ? "+" : "") + rate.toFixed(1) + "%"}</td>
+    <td><div class="row-act"><button class="edit" title="수정">✎</button><button class="del" title="삭제">🗑</button></div></td></tr>`;
+}
+function stkEditorHtml(s) {
+  return `<tr class="edit-row" data-sid="${s.id || ""}">
+    <td><select class="stk-who">${["쩡이", "슬구"].map(w => `<option${(s.who || "쩡이") === w ? " selected" : ""}>${w}</option>`).join("")}</select></td>
+    <td><input class="stk-name" value="${esc(s.name || "")}" placeholder="종목명" style="width:130px"></td>
+    <td><select class="stk-market"><option value="KR"${s.market !== "US" ? " selected" : ""}>한국</option><option value="US"${s.market === "US" ? " selected" : ""}>미국</option></select>
+        <input class="stk-code" value="${esc(s.code || "")}" placeholder="005930 / AAPL" style="width:92px"></td>
+    <td class="amt"><input class="stk-qty" inputmode="decimal" value="${s.qty ? s.qty.toLocaleString("ko-KR") : ""}" placeholder="수량" style="width:70px;text-align:right"></td>
+    <td class="amt"><input class="stk-avg" inputmode="decimal" value="${s.avg ? s.avg.toLocaleString("ko-KR") : ""}" placeholder="평단가" style="width:100px;text-align:right"></td>
+    <td colspan="4" style="color:var(--muted);font-size:11.5px">코드: 한국 주식 = 종목코드 6자리 · 미국 주식 = 티커</td>
+    <td><div class="er-act"><button class="er-save" title="저장">✓</button><button class="er-cancel" title="취소">✕</button></div></td></tr>`;
+}
+function bindStkEditor(tr) {
+  bindDecimalInput(tr.querySelector(".stk-avg"));
+  bindDecimalInput(tr.querySelector(".stk-qty"));
+  const saveFn = () => {
+    const num = (v) => Number(String(v).replace(/[,\s]/g, "")) || 0;
+    const data = {
+      who: tr.querySelector(".stk-who").value,
+      market: tr.querySelector(".stk-market").value,
+      code: tr.querySelector(".stk-code").value.trim().toUpperCase(),
+      name: tr.querySelector(".stk-name").value.trim(),
+      qty: num(tr.querySelector(".stk-qty").value),
+      avg: num(tr.querySelector(".stk-avg").value)
+    };
+    if (!data.code) { toast("종목 코드를 입력하세요"); return; }
+    if (!data.qty || !data.avg) { toast("수량과 평단가를 입력하세요"); return; }
+    const id = tr.dataset.sid;
+    if (id) { const it = stocks.find(x => x.id === id); if (it) Object.assign(it, data); toast("수정했어요"); }
+    else { stocks.push({ id: uid(), ...data }); toast("추가했어요 — 시세는 다음 장 마감 후부터"); }
+    stocksDirty = true;
+    save();
+    renderStocks();
+  };
+  tr.querySelector(".er-save").addEventListener("click", saveFn);
+  tr.querySelector(".er-cancel").addEventListener("click", renderStocks);
+  tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
+  tr.querySelector(".stk-name").focus();
+}
+function bindStkRows() {
+  $("stkBody").querySelectorAll("tr[data-sid]").forEach(tr => {
+    const id = tr.dataset.sid;
+    tr.querySelector(".del")?.addEventListener("click", async () => {
+      if (!await uiConfirm("이 종목을 삭제할까요?", { ok: "삭제" })) return;
+      stocks = stocks.filter(x => x.id !== id);
+      stocksDirty = true; save(); renderStocks(); toast("삭제했어요");
+    });
+    const openEdit = () => {
+      const it = stocks.find(x => x.id === id);
+      if (!it) return;
+      if ($("stkBody").querySelector(".edit-row")) renderStocks();
+      const cur = $("stkBody").querySelector(`tr[data-sid="${id}"]`);
+      if (!cur) return;
+      const temp = document.createElement("tbody");
+      temp.innerHTML = stkEditorHtml(it);
+      cur.replaceWith(temp.firstElementChild);
+      bindStkEditor($("stkBody").querySelector(`.edit-row[data-sid="${id}"]`));
+    };
+    tr.querySelector(".edit")?.addEventListener("click", openEdit);
+    tr.addEventListener("dblclick", (ev) => { if (!ev.target.closest("input,button,select")) openEdit(); });
+  });
+}
+$("stkAddBtn").addEventListener("click", () => {
+  if ($("stkBody").querySelector('.edit-row[data-sid=""]')) return;
+  if ($("stkBody").querySelector(".edit-row")) renderStocks();
+  if ($("stkBody").querySelector(".empty")) $("stkBody").innerHTML = "";
+  const temp = document.createElement("tbody");
+  temp.innerHTML = stkEditorHtml({});
+  $("stkBody").prepend(temp.firstElementChild);
+  bindStkEditor($("stkBody").querySelector('.edit-row[data-sid=""]'));
+});
+async function ghLoadPrices() { // 데이터 저장소의 prices.json (Actions가 장 마감 후 갱신)
+  if (!ghActive()) return;
+  const res = await fetch(`https://api.github.com/repos/${ghCfg.owner}/${ghCfg.repo}/contents/prices.json?t=` + Date.now(), { headers: ghHeaders(), cache: "no-store" });
+  if (!res.ok) return;
+  const j = await res.json();
+  try {
+    const bin = Uint8Array.from(atob(String(j.content || "").replace(/\n/g, "")), c => c.charCodeAt(0));
+    stockPrices = JSON.parse(new TextDecoder().decode(bin));
+  } catch (e) { console.error(e); }
+}
+async function ghWriteStocks() { // 종목 목록 → stocks.json (Actions가 이 목록으로 시세 수집)
+  if (!ghActive() || !stocksDirty) return;
+  try {
+    const url = `https://api.github.com/repos/${ghCfg.owner}/${ghCfg.repo}/contents/stocks.json`;
+    const head = await fetch(url + "?t=" + Date.now(), { headers: ghHeaders(), cache: "no-store" });
+    const sha = head.ok ? (await head.json()).sha : null;
+    const body = {
+      message: "종목 목록 갱신",
+      content: b64FromBytes(new TextEncoder().encode(JSON.stringify({ list: priceCodes() }, null, 1))),
+      branch: ghCfg.branch || "main"
+    };
+    if (sha) body.sha = sha;
+    const res = await fetch(url, { method: "PUT", headers: ghHeaders(), body: JSON.stringify(body) });
+    if (res.ok) { stocksDirty = false; ghTriggerPrices(); }
+  } catch (e) { console.error(e); }
+}
+async function ghTriggerPrices() { // 종목이 바뀌면 시세 수집을 즉시 실행 → 잠시 후 자동 반영
+  try {
+    const res = await fetch(`https://api.github.com/repos/${ghCfg.owner}/${ghCfg.repo}/actions/workflows/update-prices.yml/dispatches`,
+      { method: "POST", headers: ghHeaders(), body: JSON.stringify({ ref: ghCfg.branch || "main" }) });
+    if (!res.ok) return;
+    toast("시세 받아오는 중 — 30초쯤 뒤 자동 반영돼요");
+    const prevUpd = stockPrices.updated;
+    let tries = 0;
+    const poll = async () => {
+      if (++tries > 8) return;
+      await ghLoadPrices().catch(() => {});
+      if (stockPrices.updated !== prevUpd) {
+        if (mainMenu === "savings" && savingsView === "stock") renderStocks();
+        toast("시세 반영 완료");
+        return;
+      }
+      setTimeout(poll, 10000);
+    };
+    setTimeout(poll, 20000);
+  } catch (e) { console.error(e); }
+}
+
+/* ═══════════ 가계부 · 지역카드 (여민전·대전사랑카드 잔액 관리) ═══════════ */
+function regionAll() { // 생활비의 지역카드 지출(→자동 충전) + 직접 입력한 지역카드 내역
+  const autos = entries.filter(e => e.type === "exp" && REGION_CARDS.includes(e.cat))
+    .map(e => ({ id: "auto-" + e.id, card: e.cat, who: e.who, date: e.date, type: "충전", title: e.title || "충전", amount: e.amount, auto: true }));
+  return autos.concat(regionTx);
+}
+function renderRegion() {
+  const fmt = (n) => Math.round(n).toLocaleString();
+  const all = regionAll();
+  const cards = [...new Set(REGION_CARDS.concat(all.map(t => t.card).filter(Boolean)))];
+  const bal = {};
+  cards.forEach(c => bal[c] = { charge: 0, use: 0 });
+  all.forEach(t => { if (!bal[t.card]) bal[t.card] = { charge: 0, use: 0 }; bal[t.card][t.type === "충전" ? "charge" : "use"] += t.amount || 0; });
+  $("regionCards").innerHTML = cards.map(c => {
+    const b = bal[c], remain = b.charge - b.use;
+    return `<div class="stat"><div class="label">${esc(c)} 남은 금액</div>
+      <div class="value ${remain >= 0 ? "inc" : "exp"}">${fmt(remain)}원</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">충전 ${fmt(b.charge)} · 사용 ${fmt(b.use)}</div></div>`;
+  }).join("");
+  // 카드별 그룹 → 최신순 내역
+  const tx = [...all].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  if (!tx.length) { $("regionBody").innerHTML = `<tr><td colspan="7"><div class="empty">내역이 없습니다 — 생활비에서 여민전·대전사랑카드로 지출하면 자동 충전되고, ＋ 추가로 사용 내역을 기록하세요</div></td></tr>`; return; }
+  let html = "";
+  cards.forEach(c => {
+    const list = tx.filter(t => t.card === c);
+    if (!list.length) return;
+    const b = bal[c], remain = b.charge - b.use;
+    html += `<tr class="day-sep"><td colspan="7">${esc(c)} · 남은 <b style="color:${remain >= 0 ? "var(--inc)" : "var(--exp)"}">${fmt(remain)}원</b></td></tr>`;
+    list.forEach(t => { html += regionRowHtml(t); });
+  });
+  $("regionBody").innerHTML = html;
+  bindRegionRows();
+}
+function regionRowHtml(t) {
+  const isCharge = t.type === "충전", fmt = (n) => Math.round(n).toLocaleString();
+  return `<tr data-rid="${t.id}"${t.auto ? "" : ' title="더블클릭으로 수정"'}>
+    <td class="cat-tag">${esc(t.card || "-")}</td>
+    <td class="cat-tag">${esc(t.who || "-")}</td>
+    <td>${t.date ? t.date.slice(2) : "-"}</td>
+    <td><span class="badge ${isCharge ? "i" : "e"}">${isCharge ? "충전" : "사용"}</span></td>
+    <td>${esc(t.title || "-")}${t.auto ? ` <span style="color:var(--muted);font-size:10.5px">생활비</span>` : ""}</td>
+    <td class="amt ${isCharge ? "i" : "e"}">${isCharge ? "+" : "-"}${fmt(t.amount || 0)}</td>
+    <td>${t.auto ? "" : `<div class="row-act"><button class="edit" title="수정">✎</button><button class="del" title="삭제">🗑</button></div>`}</td></tr>`;
+}
+function regionEditorHtml(t) {
+  const cards = [...new Set(REGION_CARDS.concat(regionTx.map(x => x.card).filter(Boolean)))];
+  return `<tr class="edit-row" data-rid="${t.id || ""}">
+    <td><select class="rg-card">${cards.map(c => `<option${(t.card || cards[0]) === c ? " selected" : ""}>${esc(c)}</option>`).join("")}</select></td>
+    <td><select class="rg-who">${["쩡이", "슬구", "현금"].map(w => `<option${(t.who || lastWho()) === w ? " selected" : ""}>${w}</option>`).join("")}</select></td>
+    <td><input class="rg-date" inputmode="numeric" value="${t.date || todayStr()}" placeholder="260911" style="width:92px"></td>
+    <td><select class="rg-type"><option value="사용"${t.type !== "충전" ? " selected" : ""}>사용</option><option value="충전"${t.type === "충전" ? " selected" : ""}>충전</option></select></td>
+    <td><input class="rg-title" value="${esc(t.title || "")}" placeholder="내용" style="width:100%"></td>
+    <td class="amt"><input class="rg-amt" inputmode="numeric" value="${t.amount ? t.amount.toLocaleString() : ""}" placeholder="금액" style="width:110px;text-align:right"></td>
+    <td><div class="er-act"><button class="er-save" title="저장">✓</button><button class="er-cancel" title="취소">✕</button></div></td></tr>`;
+}
+function bindRegionEditor(tr) {
+  bindAmountInput(tr.querySelector(".rg-amt"));
+  const saveFn = () => {
+    const date = smartDate(tr.querySelector(".rg-date").value, new Date().getFullYear());
+    if (date === null) { toast("날짜 형식을 확인하세요 (예: 260911)"); return; }
+    const data = { card: tr.querySelector(".rg-card").value, who: tr.querySelector(".rg-who").value, date, type: tr.querySelector(".rg-type").value, title: tr.querySelector(".rg-title").value.trim(), amount: parseAmount(tr.querySelector(".rg-amt").value) || 0 };
+    if (!data.amount) { toast("금액을 입력하세요"); return; }
+    const id = tr.dataset.rid;
+    if (id) { const it = regionTx.find(x => x.id === id); if (it) Object.assign(it, data); toast("수정했어요"); }
+    else { regionTx.push({ id: uid(), ...data }); toast((data.type === "충전" ? "충전 " : "사용 ") + fmtWon(data.amount) + " 기록"); }
+    save(); renderRegion();
+  };
+  tr.querySelector(".er-save").addEventListener("click", saveFn);
+  tr.querySelector(".er-cancel").addEventListener("click", renderRegion);
+  tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
+  tr.querySelector(".rg-title").focus();
+}
+function bindRegionRows() {
+  $("regionBody").querySelectorAll("tr[data-rid]").forEach(tr => {
+    const id = tr.dataset.rid;
+    if (id.startsWith("auto-")) return; // 생활비 연동 충전 행 — 여기선 수정 불가 (생활비에서 관리)
+    tr.querySelector(".del")?.addEventListener("click", async () => {
+      if (!await uiConfirm("이 내역을 삭제할까요?", { ok: "삭제" })) return;
+      regionTx = regionTx.filter(x => x.id !== id); save(); renderRegion(); toast("삭제했어요");
+    });
+    const openEdit = () => {
+      const it = regionTx.find(x => x.id === id); if (!it) return;
+      if ($("regionBody").querySelector(".edit-row")) renderRegion();
+      const cur = $("regionBody").querySelector(`tr[data-rid="${id}"]`); if (!cur) return;
+      const temp = document.createElement("tbody"); temp.innerHTML = regionEditorHtml(it);
+      cur.replaceWith(temp.firstElementChild);
+      bindRegionEditor($("regionBody").querySelector(`.edit-row[data-rid="${id}"]`));
+    };
+    tr.querySelector(".edit")?.addEventListener("click", openEdit);
+    tr.addEventListener("dblclick", (ev) => { if (!ev.target.closest("input,button,select")) openEdit(); });
+  });
+}
+document.addEventListener("DOMContentLoaded", () => {
+  $("regionAddBtn")?.addEventListener("click", () => {
+    if ($("regionBody").querySelector('.edit-row[data-rid=""]')) return;
+    if ($("regionBody").querySelector(".edit-row")) renderRegion();
+    if ($("regionBody").querySelector(".empty")) $("regionBody").innerHTML = "";
+    const temp = document.createElement("tbody"); temp.innerHTML = regionEditorHtml({});
+    $("regionBody").prepend(temp.firstElementChild);
+    bindRegionEditor($("regionBody").querySelector('.edit-row[data-rid=""]'));
+  });
+});
+
+/* ═══════════ 재테크 · 부동산 (직접입력) ═══════════ */
+function renderEstates() {
+  const fmt = (n) => Math.round(n).toLocaleString();
+  const buy = estates.reduce((a, e) => a + (e.buy || 0), 0);
+  const now = estates.reduce((a, e) => a + (e.now || e.buy || 0), 0);
+  const pr = now - buy, rate = buy ? pr / buy * 100 : 0, col = pr >= 0 ? "var(--exp)" : "var(--accent)";
+  $("estCards").innerHTML = estates.length ? `
+    <div class="stat"><div class="label">현재 평가액</div><div class="value">${fmt(now)}원</div></div>
+    <div class="stat"><div class="label">매입가 합계</div><div class="value" style="font-size:16px">${fmt(buy)}원</div></div>
+    <div class="stat"><div class="label">평가손익</div><div class="value" style="color:${col}">${pr >= 0 ? "+" : ""}${fmt(pr)} (${rate >= 0 ? "+" : ""}${rate.toFixed(1)}%)</div></div>` : "";
+  if (!estates.length) { $("estBody").innerHTML = `<tr><td colspan="6"><div class="empty">부동산이 없습니다 — ＋ 추가로 입력하세요</div></td></tr>`; return; }
+  $("estBody").innerHTML = estates.map(e => {
+    const p = (e.now || 0) - (e.buy || 0), c = p >= 0 ? "var(--exp)" : "var(--accent)";
+    return `<tr data-eid2="${e.id}" title="더블클릭으로 수정">
+      <td style="font-weight:600">${esc(e.name || "-")}</td>
+      <td class="amt">${fmt(e.buy || 0)}</td>
+      <td class="amt" style="font-weight:700">${fmt(e.now || 0)}</td>
+      <td class="amt" style="color:${e.now ? c : ""}">${e.now ? (p >= 0 ? "+" : "") + fmt(p) : "-"}</td>
+      <td style="color:var(--muted);font-size:12px">${esc(e.memo || "")}</td>
+      <td><div class="row-act"><button class="edit" title="수정">✎</button><button class="del" title="삭제">🗑</button></div></td></tr>`;
+  }).join("");
+  bindAssetRows("estBody", "eid2", estates, estEditorHtml, bindEstEditor);
+}
+function estEditorHtml(e) {
+  return `<tr class="edit-row" data-eid2="${e.id || ""}">
+    <td><input class="est-name" value="${esc(e.name || "")}" placeholder="예: 우리집 아파트" style="width:150px"></td>
+    <td class="amt"><input class="est-buy" inputmode="numeric" value="${e.buy ? e.buy.toLocaleString() : ""}" placeholder="매입가" style="width:120px;text-align:right"></td>
+    <td class="amt"><input class="est-now" inputmode="numeric" value="${e.now ? e.now.toLocaleString() : ""}" placeholder="현재시세" style="width:120px;text-align:right"></td>
+    <td></td>
+    <td><input class="est-memo" value="${esc(e.memo || "")}" placeholder="메모" style="width:120px"></td>
+    <td><div class="er-act"><button class="er-save" title="저장">✓</button><button class="er-cancel" title="취소">✕</button></div></td></tr>`;
+}
+function bindEstEditor(tr) {
+  bindAmountInput(tr.querySelector(".est-buy")); bindAmountInput(tr.querySelector(".est-now"));
+  const saveFn = () => {
+    const data = { name: tr.querySelector(".est-name").value.trim(), buy: parseAmount(tr.querySelector(".est-buy").value) || 0, now: parseAmount(tr.querySelector(".est-now").value) || 0, memo: tr.querySelector(".est-memo").value.trim() };
+    if (!data.name) { toast("이름을 입력하세요"); return; }
+    const id = tr.dataset.eid2;
+    if (id) { const it = estates.find(x => x.id === id); if (it) Object.assign(it, data); toast("수정했어요"); }
+    else { estates.push({ id: uid(), ...data }); toast("추가했어요"); }
+    save(); renderEstates();
+  };
+  tr.querySelector(".er-save").addEventListener("click", saveFn);
+  tr.querySelector(".er-cancel").addEventListener("click", renderEstates);
+  tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
+  tr.querySelector(".est-name").focus();
+}
+$("estAddBtn").addEventListener("click", () => addAssetRow("estBody", "eid2", estEditorHtml, bindEstEditor));
+
+/* ═══════════ 재테크 · 대출 (부채) ═══════════ */
+function renderLoans() {
+  const fmt = (n) => Math.round(n).toLocaleString();
+  const bal = loans.reduce((a, l) => a + (l.balance || 0), 0);
+  const mon = loans.reduce((a, l) => a + (l.monthly || 0), 0);
+  $("loanCards").innerHTML = loans.length ? `
+    <div class="stat"><div class="label">총 대출잔액</div><div class="value exp">-${fmt(bal)}원</div></div>
+    <div class="stat"><div class="label">월 상환액 합계</div><div class="value exp">${fmt(mon)}원</div></div>` : "";
+  if (!loans.length) { $("loanBody").innerHTML = `<tr><td colspan="6"><div class="empty">대출이 없습니다 — ＋ 추가로 입력하세요</div></td></tr>`; return; }
+  $("loanBody").innerHTML = loans.map(l => `<tr data-lid="${l.id}" title="더블클릭으로 수정">
+    <td style="font-weight:600">${esc(l.name || "-")}</td>
+    <td class="amt exp" style="font-weight:700">-${fmt(l.balance || 0)}</td>
+    <td class="amt">${(l.rate || 0)}%</td>
+    <td class="amt">${fmt(l.monthly || 0)}</td>
+    <td style="color:var(--muted);font-size:12px">${esc(l.memo || "")}</td>
+    <td><div class="row-act"><button class="edit" title="수정">✎</button><button class="del" title="삭제">🗑</button></div></td></tr>`).join("");
+  bindAssetRows("loanBody", "lid", loans, loanEditorHtml, bindLoanEditor);
+}
+function loanEditorHtml(l) {
+  return `<tr class="edit-row" data-lid="${l.id || ""}">
+    <td><input class="loan-name" value="${esc(l.name || "")}" placeholder="예: 주택담보대출" style="width:150px"></td>
+    <td class="amt"><input class="loan-bal" inputmode="numeric" value="${l.balance ? l.balance.toLocaleString() : ""}" placeholder="잔액" style="width:120px;text-align:right"></td>
+    <td class="amt"><input class="loan-rate" inputmode="decimal" value="${l.rate || ""}" placeholder="금리%" style="width:60px;text-align:right"></td>
+    <td class="amt"><input class="loan-mon" inputmode="numeric" value="${l.monthly ? l.monthly.toLocaleString() : ""}" placeholder="월상환" style="width:100px;text-align:right"></td>
+    <td><input class="loan-memo" value="${esc(l.memo || "")}" placeholder="메모" style="width:120px"></td>
+    <td><div class="er-act"><button class="er-save" title="저장">✓</button><button class="er-cancel" title="취소">✕</button></div></td></tr>`;
+}
+function bindLoanEditor(tr) {
+  bindAmountInput(tr.querySelector(".loan-bal")); bindAmountInput(tr.querySelector(".loan-mon"));
+  const saveFn = () => {
+    const data = { name: tr.querySelector(".loan-name").value.trim(), balance: parseAmount(tr.querySelector(".loan-bal").value) || 0, rate: Number(tr.querySelector(".loan-rate").value.replace(/[^\d.]/g, "")) || 0, monthly: parseAmount(tr.querySelector(".loan-mon").value) || 0, memo: tr.querySelector(".loan-memo").value.trim() };
+    if (!data.name) { toast("이름을 입력하세요"); return; }
+    const id = tr.dataset.lid;
+    if (id) { const it = loans.find(x => x.id === id); if (it) Object.assign(it, data); toast("수정했어요"); }
+    else { loans.push({ id: uid(), ...data }); toast("추가했어요"); }
+    save(); renderLoans();
+  };
+  tr.querySelector(".er-save").addEventListener("click", saveFn);
+  tr.querySelector(".er-cancel").addEventListener("click", renderLoans);
+  tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
+  tr.querySelector(".loan-name").focus();
+}
+$("loanAddBtn").addEventListener("click", () => addAssetRow("loanBody", "lid", loanEditorHtml, bindLoanEditor));
+
+/* 자산 표 공용 행 바인딩 (부동산·대출) */
+function bindAssetRows(bodyId, attr, arr, editorFn, bindFn) {
+  $(bodyId).querySelectorAll(`tr[data-${attr}]`).forEach(tr => {
+    const id = tr.dataset[attr === "eid2" ? "eid2" : "lid"];
+    tr.querySelector(".del")?.addEventListener("click", async () => {
+      if (!await uiConfirm("삭제할까요?", { ok: "삭제" })) return;
+      const i = arr.findIndex(x => x.id === id); if (i >= 0) arr.splice(i, 1);
+      save(); (bodyId === "estBody" ? renderEstates : renderLoans)(); toast("삭제했어요");
+    });
+    const openEdit = () => {
+      const it = arr.find(x => x.id === id); if (!it) return;
+      if ($(bodyId).querySelector(".edit-row")) (bodyId === "estBody" ? renderEstates : renderLoans)();
+      const cur = $(bodyId).querySelector(`tr[data-${attr}="${id}"]`); if (!cur) return;
+      const temp = document.createElement("tbody"); temp.innerHTML = editorFn(it);
+      cur.replaceWith(temp.firstElementChild);
+      bindFn($(bodyId).querySelector(`.edit-row[data-${attr}="${id}"]`));
+    };
+    tr.querySelector(".edit")?.addEventListener("click", openEdit);
+    tr.addEventListener("dblclick", (ev) => { if (!ev.target.closest("input,button,select")) openEdit(); });
+  });
+}
+function addAssetRow(bodyId, attr, editorFn, bindFn) {
+  if ($(bodyId).querySelector(`.edit-row[data-${attr}=""]`)) return;
+  if ($(bodyId).querySelector(".edit-row")) (bodyId === "estBody" ? renderEstates : renderLoans)();
+  if ($(bodyId).querySelector(".empty")) $(bodyId).innerHTML = "";
+  const temp = document.createElement("tbody"); temp.innerHTML = editorFn({});
+  $(bodyId).prepend(temp.firstElementChild);
+  bindFn($(bodyId).querySelector(`.edit-row[data-${attr}=""]`));
+}
+
+/* ═══════════ 재테크 · 퇴직연금 (ETF 시세 자동 + 채권·예금 직접입력) ═══════════ */
+function penCalc(p) {
+  if (p.kind === "ETF") {
+    const price = stockPrices && stockPrices.prices ? stockPrices.prices[p.code] : null;
+    const buy = (p.avg || 0) * (p.qty || 0);
+    const evalV = (typeof price === "number" && price > 0) ? price * (p.qty || 0) : null;
+    return { buy, evalV, price };
+  }
+  return { buy: p.amount || 0, evalV: p.amount || 0, price: null };
+}
+function renderPension() {
+  const fmt = (n) => Math.round(n).toLocaleString("ko-KR");
+  const groups = {};
+  pension.forEach(p => { const w = p.who || "기타"; (groups[w] = groups[w] || []).push(p); });
+  const order = ["쩡이", "슬구"].filter(w => groups[w]).concat(Object.keys(groups).filter(w => w !== "쩡이" && w !== "슬구"));
+  const sumOf = (list) => list.reduce((a, p) => { const c = penCalc(p); a.buy += c.buy; a.evalV += (c.evalV != null ? c.evalV : c.buy); return a; }, { buy: 0, evalV: 0 });
+  const card = (label, c) => {
+    const profit = c.evalV - c.buy, rate = c.buy ? profit / c.buy * 100 : 0;
+    const col = profit >= 0 ? "var(--exp)" : "var(--accent)";
+    return `<div class="stat"><div class="label">${esc(label)}</div>
+      <div class="value">평가 ${fmt(c.evalV)}원</div>
+      <div style="font-size:11px;color:${col};margin-top:2px">${profit >= 0 ? "+" : ""}${fmt(profit)} (${rate >= 0 ? "+" : ""}${rate.toFixed(1)}%)</div></div>`;
+  };
+  $("penCards").innerHTML = pension.length
+    ? order.map(w => card(w + " 퇴직연금", sumOf(groups[w]))).join("") + card("둘이 합산", sumOf(pension))
+    : "";
+  if (!pension.length) { $("penBody").innerHTML = `<tr><td colspan="9"><div class="empty">퇴직연금 자산이 없습니다 — ＋ 추가로 ETF·채권·예금을 입력하세요</div></td></tr>`; return; }
+  let html = "";
+  order.forEach(w => {
+    const c = sumOf(groups[w]), pr = c.evalV - c.buy;
+    html += `<tr class="day-sep"><td colspan="9">${esc(w)} · ${groups[w].length}건 · 평가 <b>${fmt(c.evalV)}원</b>${c.buy ? ` (<span style="color:${pr >= 0 ? "var(--exp)" : "var(--accent)"}">${pr >= 0 ? "+" : ""}${fmt(pr)}, ${(pr / c.buy * 100).toFixed(1)}%</span>)` : ""}</td></tr>`;
+    groups[w].forEach(p => { html += penRowHtml(p); });
+  });
+  $("penBody").innerHTML = html;
+  bindPenRows();
+}
+function penRowHtml(p) {
+  const c = penCalc(p), fmt = (n) => Math.round(n).toLocaleString();
+  const isEtf = p.kind === "ETF";
+  const profit = (isEtf && c.evalV != null) ? c.evalV - c.buy : null;
+  const rate = (profit != null && c.buy) ? profit / c.buy * 100 : null;
+  const col = profit == null ? "" : profit >= 0 ? "var(--exp)" : "var(--accent)";
+  return `<tr data-pid="${p.id}" title="더블클릭으로 수정">
+    <td class="cat-tag">${esc(p.who || "-")}</td>
+    <td class="cat-tag">${esc(p.kind || "ETF")}</td>
+    <td style="font-weight:600">${esc(p.name || "-")}${isEtf && p.code ? ` <span style="color:var(--muted);font-weight:400">${esc(p.code)}</span>` : ""}</td>
+    <td class="amt">${isEtf ? (p.qty || 0).toLocaleString() : "-"}</td>
+    <td class="amt">${isEtf ? fmt(p.avg || 0) : "-"}</td>
+    <td class="amt">${isEtf ? (c.price == null ? `<span style="color:var(--muted);font-size:11px">시세 대기</span>` : fmt(c.price)) : "-"}</td>
+    <td class="amt" style="font-weight:700">${c.evalV == null ? "-" : fmt(c.evalV)}</td>
+    <td class="amt" style="color:${col};font-weight:700">${rate == null ? "-" : (rate >= 0 ? "+" : "") + rate.toFixed(1) + "%"}</td>
+    <td><div class="row-act"><button class="edit" title="수정">✎</button><button class="del" title="삭제">🗑</button></div></td></tr>`;
+}
+function penEditorHtml(p) {
+  const k = p.kind || "ETF";
+  return `<tr class="edit-row" data-pid="${p.id || ""}">
+    <td><select class="pen-who">${["쩡이", "슬구"].map(w => `<option${(p.who || "쩡이") === w ? " selected" : ""}>${w}</option>`).join("")}</select></td>
+    <td><select class="pen-kind">${["ETF", "채권", "예금"].map(x => `<option${k === x ? " selected" : ""}>${x}</option>`).join("")}</select></td>
+    <td><input class="pen-name" value="${esc(p.name || "")}" placeholder="종목/상품명" style="width:120px">
+        <input class="pen-code" value="${esc(p.code || "")}" placeholder="ETF코드" style="width:80px"></td>
+    <td class="amt"><input class="pen-qty" inputmode="decimal" value="${p.qty ? p.qty.toLocaleString() : ""}" placeholder="수량" style="width:64px;text-align:right"></td>
+    <td class="amt"><input class="pen-avg" inputmode="decimal" value="${p.avg ? p.avg.toLocaleString() : ""}" placeholder="평단가" style="width:90px;text-align:right"></td>
+    <td colspan="2" class="amt"><input class="pen-amount" inputmode="numeric" value="${p.amount ? p.amount.toLocaleString() : ""}" placeholder="평가금액(채권·예금)" style="width:150px;text-align:right"></td>
+    <td><div class="er-act"><button class="er-save" title="저장">✓</button><button class="er-cancel" title="취소">✕</button></div></td></tr>`;
+}
+function bindPenEditor(tr) {
+  ["pen-qty", "pen-avg"].forEach(c => bindDecimalInput(tr.querySelector("." + c)));
+  bindAmountInput(tr.querySelector(".pen-amount"));
+  const toggle = () => {
+    const etf = tr.querySelector(".pen-kind").value === "ETF";
+    tr.querySelectorAll(".pen-code, .pen-qty, .pen-avg").forEach(i => { i.disabled = !etf; i.style.opacity = etf ? 1 : .4; });
+    tr.querySelector(".pen-amount").disabled = etf; tr.querySelector(".pen-amount").style.opacity = etf ? .4 : 1;
+  };
+  tr.querySelector(".pen-kind").addEventListener("change", toggle); toggle();
+  const saveFn = () => {
+    const num = (v) => Number(String(v).replace(/[,\s]/g, "")) || 0;
+    const kind = tr.querySelector(".pen-kind").value;
+    const data = { who: tr.querySelector(".pen-who").value, kind, name: tr.querySelector(".pen-name").value.trim(),
+      code: tr.querySelector(".pen-code").value.trim().toUpperCase(), qty: num(tr.querySelector(".pen-qty").value),
+      avg: num(tr.querySelector(".pen-avg").value), amount: num(tr.querySelector(".pen-amount").value) };
+    if (kind === "ETF") { if (!data.code || !data.qty || !data.avg) { toast("ETF는 코드·수량·평단가를 입력하세요"); return; } data.amount = 0; }
+    else { if (!data.amount) { toast("평가금액을 입력하세요"); return; } data.code = ""; data.qty = 0; data.avg = 0; }
+    const id = tr.dataset.pid;
+    const prevCode = id ? (pension.find(x => x.id === id) || {}).code : null;
+    if (id) { const it = pension.find(x => x.id === id); if (it) Object.assign(it, data); toast("수정했어요"); }
+    else { pension.push({ id: uid(), ...data }); toast(kind === "ETF" ? "추가했어요 — 시세는 다음 갱신부터" : "추가했어요"); }
+    if (kind === "ETF" && data.code !== prevCode) stocksDirty = true;
+    save();
+    renderPension();
+  };
+  tr.querySelector(".er-save").addEventListener("click", saveFn);
+  tr.querySelector(".er-cancel").addEventListener("click", renderPension);
+  tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
+  tr.querySelector(".pen-name").focus();
+}
+function bindPenRows() {
+  $("penBody").querySelectorAll("tr[data-pid]").forEach(tr => {
+    const id = tr.dataset.pid;
+    tr.querySelector(".del")?.addEventListener("click", async () => {
+      if (!await uiConfirm("이 항목을 삭제할까요?", { ok: "삭제" })) return;
+      pension = pension.filter(x => x.id !== id); stocksDirty = true; save(); renderPension(); toast("삭제했어요");
+    });
+    const openEdit = () => {
+      const it = pension.find(x => x.id === id);
+      if (!it) return;
+      if ($("penBody").querySelector(".edit-row")) renderPension();
+      const cur = $("penBody").querySelector(`tr[data-pid="${id}"]`);
+      if (!cur) return;
+      const temp = document.createElement("tbody");
+      temp.innerHTML = penEditorHtml(it);
+      cur.replaceWith(temp.firstElementChild);
+      bindPenEditor($("penBody").querySelector(`.edit-row[data-pid="${id}"]`));
+    };
+    tr.querySelector(".edit")?.addEventListener("click", openEdit);
+    tr.addEventListener("dblclick", (ev) => { if (!ev.target.closest("input,button,select")) openEdit(); });
+  });
+}
+
+/* ═══════════ 재테크 · 적금/예금 (예상이자·세후 자동 계산) ═══════════ */
+function savMonths(s) { // 가입~만료 개월수
+  if (!s.start || !s.end) return 0;
+  const a = new Date(s.start), b = new Date(s.end);
+  let m = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+  if (b.getDate() >= a.getDate()) m += 0; // 일 단위는 개월로 반올림 생략(단리 근사)
+  return Math.max(0, m);
+}
+function savCalc(s) { // 단리 기준 원금·세전이자·세금·세후이자·만기수령
+  const n = savMonths(s), rate = (s.rate || 0) / 100;
+  let principal, gross;
+  if (s.kind === "예금") { principal = s.amount || 0; gross = principal * rate * n / 12; }
+  else { principal = (s.amount || 0) * n; gross = (s.amount || 0) * rate * (n * (n + 1) / 2) / 12; } // 정기적금 단리
+  const tax = s.taxFree ? 0 : Math.round(gross * 0.154);
+  const net = gross - tax;
+  return { months: n, principal, gross, tax, net, total: principal + net };
+}
+function renderSavings() {
+  const fmt = (n) => Math.round(n).toLocaleString("ko-KR");
+  const groups = {};
+  savings.forEach(s => { const w = s.who || "기타"; (groups[w] = groups[w] || []).push(s); });
+  const order = ["쩡이", "슬구"].filter(w => groups[w]).concat(Object.keys(groups).filter(w => w !== "쩡이" && w !== "슬구"));
+  const sumOf = (list) => list.reduce((a, s) => { const c = savCalc(s); a.principal += c.principal; a.net += c.net; a.total += c.total; return a; }, { principal: 0, net: 0, total: 0 });
+  const card = (label, c) => `<div class="stat"><div class="label">${esc(label)}</div>
+    <div class="value inc">+${fmt(c.net)}원</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:2px">원금 ${fmt(c.principal)} → 만기 ${fmt(c.total)}</div></div>`;
+  $("savCards").innerHTML = savings.length
+    ? order.map(w => card(w + " 세후이자", sumOf(groups[w]))).join("") + card("둘이 합산", sumOf(savings))
+    : "";
+  if (!savings.length) { $("savBody").innerHTML = `<tr><td colspan="9"><div class="empty">가입한 적금/예금이 없습니다 — ＋ 추가로 입력하세요</div></td></tr>`; return; }
+  let html = "";
+  order.forEach(w => {
+    html += `<tr class="day-sep"><td colspan="9">${esc(w)} · ${groups[w].length}건 · 세후이자 <b style="color:var(--inc)">+${fmt(sumOf(groups[w]).net)}원</b></td></tr>`;
+    groups[w].forEach(s => { html += savRowHtml(s); });
+  });
+  $("savBody").innerHTML = html;
+  bindSavRows();
+}
+function savRowHtml(s) {
+  const c = savCalc(s), fmt = (n) => Math.round(n).toLocaleString();
+  const period = (s.start && s.end) ? `${s.start.slice(2)}~${s.end.slice(2)} · ${c.months}개월` : "-";
+  return `<tr data-svid="${s.id}" title="더블클릭으로 수정">
+    <td class="cat-tag">${esc(s.who || "-")}</td>
+    <td class="cat-tag">${esc(s.kind || "적금")}${s.taxFree ? " · 비과세" : ""}</td>
+    <td class="amt">${fmt(s.amount || 0)}${s.kind === "적금" ? "/월" : ""}</td>
+    <td class="amt">${(s.rate || 0)}%</td>
+    <td style="font-size:11.5px">${period}</td>
+    <td class="amt">${fmt(c.principal)}</td>
+    <td class="amt inc">+${fmt(c.net)}</td>
+    <td class="amt" style="font-weight:700">${fmt(c.total)}</td>
+    <td><div class="row-act"><button class="edit" title="수정">✎</button><button class="del" title="삭제">🗑</button></div></td></tr>`;
+}
+function savEditorHtml(s) {
+  return `<tr class="edit-row" data-svid="${s.id || ""}">
+    <td><select class="sav-who">${["쩡이", "슬구"].map(w => `<option${(s.who || "쩡이") === w ? " selected" : ""}>${w}</option>`).join("")}</select></td>
+    <td><select class="sav-kind"><option value="적금"${s.kind !== "예금" ? " selected" : ""}>적금</option><option value="예금"${s.kind === "예금" ? " selected" : ""}>예금</option></select></td>
+    <td class="amt"><input class="sav-amt" inputmode="numeric" value="${s.amount ? s.amount.toLocaleString() : ""}" placeholder="월납입/예치금" style="width:110px;text-align:right"></td>
+    <td class="amt"><input class="sav-rate" inputmode="decimal" value="${s.rate || ""}" placeholder="연이율%" style="width:64px;text-align:right"></td>
+    <td><input class="sav-start" inputmode="numeric" value="${s.start || ""}" placeholder="가입 260101" style="width:92px"> ~
+        <input class="sav-end" inputmode="numeric" value="${s.end || ""}" placeholder="만료 270101" style="width:92px"></td>
+    <td colspan="2" style="font-size:11.5px"><label style="cursor:pointer"><input type="checkbox" class="sav-taxfree"${s.taxFree ? " checked" : ""}> 비과세</label></td>
+    <td><div class="er-act"><button class="er-save" title="저장">✓</button><button class="er-cancel" title="취소">✕</button></div></td></tr>`;
+}
+function bindSavEditor(tr) {
+  bindAmountInput(tr.querySelector(".sav-amt"));
+  const saveFn = () => {
+    const data = {
+      who: tr.querySelector(".sav-who").value,
+      kind: tr.querySelector(".sav-kind").value,
+      amount: parseAmount(tr.querySelector(".sav-amt").value) || 0,
+      rate: Number(tr.querySelector(".sav-rate").value.replace(/[^\d.]/g, "")) || 0,
+      start: smartDate(tr.querySelector(".sav-start").value, new Date().getFullYear()),
+      end: smartDate(tr.querySelector(".sav-end").value, new Date().getFullYear()),
+      taxFree: tr.querySelector(".sav-taxfree").checked
+    };
+    if (data.start === null || data.end === null) { toast("날짜 형식을 확인하세요 (예: 260101)"); return; }
+    if (!data.amount || !data.rate) { toast("금액과 연이율을 입력하세요"); return; }
+    if (!data.start || !data.end) { toast("가입일과 만료일을 입력하세요"); return; }
+    const id = tr.dataset.svid;
+    if (id) { const it = savings.find(x => x.id === id); if (it) Object.assign(it, data); toast("수정했어요"); }
+    else { savings.push({ id: uid(), ...data }); toast("추가했어요"); }
+    save();
+    renderSavings();
+  };
+  tr.querySelector(".er-save").addEventListener("click", saveFn);
+  tr.querySelector(".er-cancel").addEventListener("click", renderSavings);
+  tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
+  tr.querySelector(".sav-amt").focus();
+}
+function bindSavRows() {
+  $("savBody").querySelectorAll("tr[data-svid]").forEach(tr => {
+    const id = tr.dataset.svid;
+    tr.querySelector(".del")?.addEventListener("click", async () => {
+      if (!await uiConfirm("이 항목을 삭제할까요?", { ok: "삭제" })) return;
+      savings = savings.filter(x => x.id !== id); save(); renderSavings(); toast("삭제했어요");
+    });
+    const openEdit = () => {
+      const it = savings.find(x => x.id === id);
+      if (!it) return;
+      if ($("savBody").querySelector(".edit-row")) renderSavings();
+      const cur = $("savBody").querySelector(`tr[data-svid="${id}"]`);
+      if (!cur) return;
+      const temp = document.createElement("tbody");
+      temp.innerHTML = savEditorHtml(it);
+      cur.replaceWith(temp.firstElementChild);
+      bindSavEditor($("savBody").querySelector(`.edit-row[data-svid="${id}"]`));
+    };
+    tr.querySelector(".edit")?.addEventListener("click", openEdit);
+    tr.addEventListener("dblclick", (ev) => { if (!ev.target.closest("input,button,select")) openEdit(); });
+  });
+}
+$("penAddBtn").addEventListener("click", () => {
+  if ($("penBody").querySelector('.edit-row[data-pid=""]')) return;
+  if ($("penBody").querySelector(".edit-row")) renderPension();
+  if ($("penBody").querySelector(".empty")) $("penBody").innerHTML = "";
+  const temp = document.createElement("tbody");
+  temp.innerHTML = penEditorHtml({});
+  $("penBody").prepend(temp.firstElementChild);
+  bindPenEditor($("penBody").querySelector('.edit-row[data-pid=""]'));
+});
+$("savAddBtn").addEventListener("click", () => {
+  if ($("savBody").querySelector('.edit-row[data-svid=""]')) return;
+  if ($("savBody").querySelector(".edit-row")) renderSavings();
+  if ($("savBody").querySelector(".empty")) $("savBody").innerHTML = "";
+  const temp = document.createElement("tbody");
+  temp.innerHTML = savEditorHtml({});
+  $("savBody").prepend(temp.firstElementChild);
+  bindSavEditor($("savBody").querySelector('.edit-row[data-svid=""]'));
+});
+
 /* 적금주식 메뉴의 사이드바 (적금/주식/보험) */
-const SAVINGS_NAMES = { deposit: "적금", stock: "주식", insurance: "보험", pension: "퇴직연금", stats: "통계" };
+const SAVINGS_NAMES = { deposit: "적금", stock: "주식", pension: "퇴직연금", estate: "부동산", loan: "대출", stats: "통계" };
 let savingsView = "deposit";
 function updateSavingsPh() {
   document.querySelectorAll("#savingsNav .side-item").forEach(x => x.classList.toggle("active", x.dataset.sv === savingsView));
-  $("phTitle").textContent = `재테크 — ${SAVINGS_NAMES[savingsView]}`;
+  const stock = savingsView === "stock";
+  const deposit = savingsView === "deposit";
+  const pen = savingsView === "pension";
+  const estate = savingsView === "estate";
+  const loan = savingsView === "loan";
+  $("stockView").classList.toggle("hidden", !stock);
+  $("savingsView").classList.toggle("hidden", !deposit);
+  $("pensionView").classList.toggle("hidden", !pen);
+  $("estateView").classList.toggle("hidden", !estate);
+  $("loanView").classList.toggle("hidden", !loan);
+  $("sectionPlaceholder").classList.toggle("hidden", stock || deposit || pen || estate || loan);
+  if (stock) {
+    renderStocks();
+    if (ghActive()) ghLoadPrices().then(renderStocks).catch(() => {}); // 최신 시세 반영
+  } else if (deposit) renderSavings();
+  else if (pen) {
+    renderPension();
+    if (ghActive()) ghLoadPrices().then(renderPension).catch(() => {});
+  } else if (estate) renderEstates();
+  else if (loan) renderLoans();
+  else $("phTitle").textContent = `재테크 — ${SAVINGS_NAMES[savingsView]}`;
 }
 document.querySelectorAll("#savingsNav .side-item").forEach(b =>
   b.addEventListener("click", () => { savingsView = b.dataset.sv; updateSavingsPh(); }));
@@ -3004,7 +4153,22 @@ function tvSetPin(lat, lng) {
   toast(`${t.name} 핀을 고정했어요`);
   return true;
 }
+let mapLibsLoading = null; // 지도 라이브러리 지연 로드 (첫 지도 열 때 1회)
+function ensureMapLibs() {
+  if (window.L && window.WORLD_GEO) return Promise.resolve();
+  if (!mapLibsLoading) {
+    const addScript = (src) => new Promise(res => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = res; document.head.appendChild(s); });
+    const addCss = (href) => new Promise(res => { const l = document.createElement("link"); l.rel = "stylesheet"; l.href = href; l.onload = res; l.onerror = res; document.head.appendChild(l); });
+    mapLibsLoading = Promise.all([addScript("world-geo.js"), addScript("leaflet.js"), addCss("leaflet.css")]);
+  }
+  return mapLibsLoading;
+}
 function renderTravelMap() {
+  if (!window.L && !window.WORLD_GEO) { // 라이브러리 로드 후 다시 그림
+    $("tvMap").innerHTML = `<div class="empty">지도 불러오는 중…</div>`;
+    ensureMapLibs().then(() => { if (travelView === "map") renderTravelMap(); });
+    return;
+  }
   const sel = $("tvPinTrip");
   const prevSel = sel.value;
   fillTvYearSel($("tvYearSelMap"));
@@ -3081,6 +4245,7 @@ document.querySelectorAll("#travelNav .side-item").forEach(b =>
   b.addEventListener("click", () => {
     if (mainMenu !== "travel") document.querySelector('#mainMenu [data-menu="travel"]').click();
     travelView = b.dataset.tv;
+    saveUiState();
     renderTravel();
   }));
 
@@ -3265,10 +4430,7 @@ function bindTvRangeRows() {
 }
 function bindTvRangeEditor(tr) {
   const amt = tr.querySelector(".tv-amt");
-  amt.addEventListener("input", () => {
-    const raw = amt.value.replace(/[^\d]/g, "");
-    amt.value = raw ? Number(raw).toLocaleString("ko-KR") : "";
-  });
+  bindAmountInput(amt);
   const saveFn = () => {
     if (!httpMode && !ghActive() && fsMode && !fileHandle) { toast("파일 연결 중이에요 — 잠시 후 다시 시도해주세요"); return; }
     const it = travelItems.find(x => x.id === tr.dataset.tid);
@@ -3320,10 +4482,7 @@ function renderTvCalTripPanel() {
 }
 function bindTvCtEditor(tr) {
   const amt = tr.querySelector(".tv-amt");
-  amt.addEventListener("input", () => {
-    const raw = amt.value.replace(/[^\d]/g, "");
-    amt.value = raw ? Number(raw).toLocaleString("ko-KR") : "";
-  });
+  bindAmountInput(amt);
   const saveFn = () => {
     if (!httpMode && !ghActive() && fsMode && !fileHandle) { toast("파일 연결 중이에요 — 잠시 후 다시 시도해주세요"); return; }
     const tvD = smartDate(tr.querySelector(".tv-date").value, tvMonth.getFullYear());
@@ -3393,10 +4552,7 @@ function tvDayEditor(it) {
 }
 function bindTvDayEditor(tr) {
   const amt = tr.querySelector(".tvd-amt");
-  amt.addEventListener("input", () => {
-    const raw = amt.value.replace(/[^\d]/g, "");
-    amt.value = raw ? Number(raw).toLocaleString("ko-KR") : "";
-  });
+  bindAmountInput(amt);
   const saveFn = () => {
     if (!httpMode && !ghActive() && fsMode && !fileHandle) { toast("파일 연결 중이에요 — 잠시 후 다시 시도해주세요"); return; }
     const data = {
@@ -3600,10 +4756,7 @@ function tvItemEditor(it) {
 }
 function bindTvItemEditor(tr) {
   const amt = tr.querySelector(".tv-amt");
-  amt.addEventListener("input", () => {
-    const raw = amt.value.replace(/[^\d]/g, "");
-    amt.value = raw ? Number(raw).toLocaleString("ko-KR") : "";
-  });
+  bindAmountInput(amt);
   const saveFn = () => {
     if (!httpMode && !ghActive() && fsMode && !fileHandle) { toast("파일 연결 중이에요 — 잠시 후 다시 시도해주세요"); return; }
     const tvD = smartDate(tr.querySelector(".tv-date").value, tvMonth.getFullYear());
@@ -3743,23 +4896,85 @@ function resetSearchFilters() {
   searchScope = "month";
   settleFilter = "all";
   typeFilter = "all";
+  whoFilter = "";
+  catFilter = "";
   rangeFrom = ""; rangeTo = "";
   scopeYear = String(new Date().getFullYear());
   $("searchInput").value = "";
   $("searchScope").value = "month";
   $("rangeFromIn").value = ""; $("rangeToIn").value = "";
 }
+const UI_STATE_KEY = "ledgerUiState"; // 새로고침해도 보던 메뉴·탭 유지
+function saveUiState() {
+  try { localStorage.setItem(UI_STATE_KEY, JSON.stringify({ menu: mainMenu, view, travelView, fxPeriod, mView: typeof mView === "undefined" ? "cal" : mView })); } catch (e) {}
+  try { history.replaceState(null, "", location.pathname + location.search + "#" + mainMenu + "/" + view); } catch (e) {} // 주소에도 기록 — 새로고침 시 주소가 화면 결정
+}
 document.querySelectorAll("#sideNav .side-item").forEach(b =>
   b.addEventListener("click", () => {
     if (mainMenu !== "ledger") document.querySelector('#mainMenu [data-menu="ledger"]').click(); // 다른 메뉴에 있으면 가계부로
     if (view !== b.dataset.view) resetSearchFilters();
     view = b.dataset.view;
+    saveUiState();
     render();
   }));
-document.querySelectorAll("#typeFilterTabs .tab").forEach(b =>
-  b.addEventListener("click", () => { typeFilter = b.dataset.tf; render(); }));
-document.querySelectorAll("#settleFilterTabs .tab").forEach(b =>
-  b.addEventListener("click", () => { settleFilter = b.dataset.sf; render(); }));
+$("lsTypeSel").addEventListener("change", () => { typeFilter = $("lsTypeSel").value; render(); });
+$("lsWhoSel").addEventListener("change", () => { whoFilter = $("lsWhoSel").value; render(); });
+$("lsCatSel").addEventListener("change", () => { catFilter = $("lsCatSel").value; render(); });
+$("eatShape").addEventListener("change", () => { eatShape = $("eatShape").value; renderEatOutStats(); });
+// 단축키 N = 추가 (입력 중·팝업 열림 상태 제외, 한/영 무관 — 윈도우·맥 공통)
+document.addEventListener("keydown", (e) => {
+  if (e.code !== "KeyN" || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+  const t = e.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+  if (!document.getElementById("dlgOverlay").classList.contains("hidden")) return;
+  if ([...document.querySelectorAll(".edit-row")].some(el => el.offsetParent !== null)) return; // 보이는 편집줄이 있을 때만 무시 (숨은 화면 잔재는 무시 안 함)
+  if (typeof IS_MOBILE !== "undefined" && IS_MOBILE) { e.preventDefault(); mOpenSheet(null); return; }
+  if (mainMenu === "savings" && savingsView === "stock") { e.preventDefault(); $("stkAddBtn").click(); return; }
+  if (mainMenu === "savings" && savingsView === "deposit") { e.preventDefault(); $("savAddBtn").click(); return; }
+  if (mainMenu === "savings" && savingsView === "pension") { e.preventDefault(); $("penAddBtn").click(); return; }
+  if (mainMenu === "savings" && savingsView === "estate") { e.preventDefault(); $("estAddBtn").click(); return; }
+  if (mainMenu === "savings" && savingsView === "loan") { e.preventDefault(); $("loanAddBtn").click(); return; }
+  if (mainMenu !== "ledger") return;
+  e.preventDefault();
+  if (view === "list") $("listAddBtn").click();
+  else if (view === "calendar") { if (!selectedDay) { selectedDay = todayStr(); render(); } $("calAddBtn")?.click(); }
+  else if (view === "fixed") $("fxAddBtn").click();
+  else if (view === "region") $("regionAddBtn").click();
+});
+// 단축키 E = 마우스 올려둔 행 수정 (더블클릭과 동일)
+let hoverRow = null;
+document.addEventListener("mouseover", (e) => {
+  const r = e.target.closest ? e.target.closest("tr[data-id], tr[data-fid], tr[data-sid], tr[data-svid], tr[data-pid], tr[data-eid2], tr[data-lid], tr[data-rid]") : null;
+  if (r) hoverRow = r;
+  else if (hoverRow && !(e.target.closest && e.target.closest("tr") === hoverRow)) hoverRow = null; // 행 밖으로 나가면 해제
+});
+document.addEventListener("keydown", (e) => {
+  if (e.code !== "KeyE" || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+  const t = e.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+  if (!document.getElementById("dlgOverlay").classList.contains("hidden")) return;
+  if ([...document.querySelectorAll(".edit-row")].some(el => el.offsetParent !== null)) return;
+  if (hoverRow && document.contains(hoverRow)) {
+    e.preventDefault();
+    hoverRow.querySelector(".edit")?.click();
+  }
+});
+// 단축키 Esc = 편집 취소 (입력줄·모바일 시트 닫기)
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (!document.getElementById("dlgOverlay").classList.contains("hidden")) return; // 팝업은 자체 버튼으로
+  if (typeof IS_MOBILE !== "undefined" && IS_MOBILE && !$("mSheetWrap").classList.contains("hidden")) { mCloseSheet(); return; }
+  document.querySelector(".edit-row .er-cancel")?.click();
+});
+$("lsSettleSel").addEventListener("change", () => { settleFilter = $("lsSettleSel").value; render(); });
+document.querySelectorAll("#listView .sort-btn[data-lsk]").forEach(b =>
+  b.addEventListener("click", () => { // 헤더 ↕ 정렬: 1클릭 → 반대 → 기본 복귀
+    const k = b.dataset.lsk;
+    if (listSort.key !== k) listSort = { key: k, dir: 1 };
+    else if (listSort.dir === 1) listSort.dir = -1;
+    else listSort = { key: "date", dir: -1 };
+    renderList();
+  }));
 $("searchScope").addEventListener("change", () => { searchScope = $("searchScope").value; render(); });
 $("rangeFromIn").addEventListener("change", () => {
   const v = smartDate($("rangeFromIn").value, new Date().getFullYear());
@@ -3774,8 +4989,15 @@ $("rangeToIn").addEventListener("change", () => {
 $("yearCtrl").addEventListener("change", () => { scopeYear = $("yearCtrl").value; render(); });
 document.querySelectorAll("#listView th.sortable").forEach(th =>
   th.addEventListener("click", () => {
-    if (listSort.key === th.dataset.sort) listSort.dir = -listSort.dir;
-    else listSort = { key: th.dataset.sort, dir: th.dataset.sort === "date" || th.dataset.sort === "amount" ? -1 : 1 };
+    const k = th.dataset.sort;
+    if (k === "date") { // 날짜는 기본(최신순)↔오름차순 왕복
+      listSort = { key: "date", dir: listSort.key === "date" && listSort.dir === -1 ? 1 : -1 };
+    } else {
+      const d0 = k === "amount" ? -1 : 1; // 컬럼별 1차 방향
+      if (listSort.key !== k) listSort = { key: k, dir: d0 };  // 1클릭: 정렬
+      else if (listSort.dir === d0) listSort.dir = -d0;        // 2클릭: 반대 방향
+      else listSort = { key: "date", dir: -1 };                // 3클릭: 기본 정렬(날짜 최신순) 복귀
+    }
     renderList();
   }));
 $("startDayBtn").addEventListener("click", async () => {
@@ -3813,10 +5035,7 @@ $("addBtn").addEventListener("click", submitEntry);
 $("cancelEditBtn").addEventListener("click", endEdit);
 ["inTitle", "inAmount", "inCat"].forEach(id =>
   $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") submitEntry(); }));
-$("inAmount").addEventListener("input", (e) => {
-  const raw = e.target.value.replace(/[^\d]/g, "");
-  e.target.value = raw ? Number(raw).toLocaleString("ko-KR") : "";
-});
+bindAmountInput($("inAmount"));
 /* 상단 메인 메뉴 (가계부/적금주식/이도계좌현황/여행경비) */
 const MENU_NAMES = { ledger: "가계부", savings: "재테크", ido: "이도계좌현황", travel: "여행기록" };
 let mainMenu = "ledger";
@@ -3830,17 +5049,25 @@ document.querySelectorAll("#mainMenu .nav-item").forEach(b =>
     const travel = mainMenu === "travel";
     $("ledgerSection").classList.toggle("hidden", !ledger);
     $("travelSection").classList.toggle("hidden", !travel);
+    ["stockView", "savingsView", "pensionView", "estateView", "loanView"].forEach(v => $(v).classList.add("hidden")); // 재테크면 updateSavingsPh가 다시 연다
     $("sectionPlaceholder").classList.toggle("hidden", ledger || travel);
     $("sideNav").classList.toggle("hidden", !ledger);
     $("savingsNav").classList.toggle("hidden", !savings);
     $("idoNav").classList.toggle("hidden", !ido);
     $("travelNav").classList.toggle("hidden", !travel);
     document.body.classList.toggle("no-side", !ledger && !savings && !ido && !travel);
+    if (!window.__bootRestoring) { // 메뉴 진입 시 사이드바는 첫 항목부터 (새로고침 복원 때는 유지)
+      if (ledger) view = "list";
+      else if (savings) savingsView = "deposit";
+      else if (ido) idoView = "deposit";
+      else if (travel) travelView = "calendar";
+    }
     if (ledger) { resetSearchFilters(); render(); }
     else if (savings) updateSavingsPh();
     else if (ido) updateIdoPh();
     else if (travel) renderTravel();
     else $("phTitle").textContent = MENU_NAMES[mainMenu];
+    if (typeof saveUiState === "function") saveUiState();
   }));
 
 $("catChartMode").addEventListener("change", renderDistribution);
@@ -3946,6 +5173,7 @@ $("chkAll").addEventListener("change", () => {
   toast(on ? "보이는 항목 전체 정산완료" : "전체 정산완료 해제");
 });
 $("listAddBtn").addEventListener("click", () => {
+  if (document.querySelector('.edit-row:not([data-eid=""])')) render(); // 수정 중이던 행은 원래대로 복귀 (한 번에 하나만)
   if ($("listBody").querySelector('.edit-row[data-eid=""]')) return; // 이미 입력 중
   const temp = document.createElement("tbody");
   temp.innerHTML = editorRowHtml({ date: todayStr(), type: entryType }, true, true, true);
@@ -3967,13 +5195,19 @@ async function loadFromHandle() {
   dbLastMod = f.lastModified;
   viewOnly = false;
   if (f.size > 0) {
-    const { all, badSheets, legacy, budgets: b, starts, fixed, tvTrips, tvItems } = await fileToEntries(fileHandle.name, await f.arrayBuffer());
+    const { all, badSheets, legacy, budgets: b, starts, fixed, tvTrips, tvItems, stocks: stk, savings: sav, pension: pen, estates: est, loans: lo, regionTx: rtx } = await fileToEntries(fileHandle.name, await f.arrayBuffer());
     entries = all;
     budgets = b || {};
     monthStarts = starts || {};
     fixedItems = fixed || [];
     travelTrips = tvTrips || [];
     travelItems = tvItems || [];
+    stocks = stk || [];
+    savings = sav || [];
+    pension = pen || [];
+    estates = est || [];
+    loans = lo || [];
+    regionTx = rtx || [];
     if (legacy) {
       // "N월" 시트 형식 = 원본에 요약/여행/자산 등 다른 시트가 섞여 있음
       // → 덮어쓰면 그 시트들이 사라지므로 원본 보존을 위해 보기 전용
@@ -3989,7 +5223,7 @@ async function loadFromHandle() {
   const latest = entries.reduce((a, e) => e.date > a ? e.date : a, "");
   if (latest) curMonth = new Date(+latest.slice(0, 4), +latest.slice(5, 7) - 1, 1);
   if (!viewOnly) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems })); } catch (e) {}
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx })); } catch (e) {}
   }
   fileState(viewOnly
     ? `👁 ${fileHandle.name} · ${entries.length}건 · 보기 전용`
@@ -4018,6 +5252,29 @@ const XLSX_TYPE = [{ description: "Excel", accept: { "application/vnd.openxmlfor
 async function initApp() {
   $("inDate").value = todayStr();
   setType("exp");
+  // 새로고침 후 보던 메뉴·탭 복원 (첫 화면부터 바로 그 자리 — 달력 스치듯 보이지 않게)
+  try {
+    const s = JSON.parse(localStorage.getItem("ledgerUiState") || "{}");
+    const h = location.hash.match(/^#([a-z]+)\/([a-z]+)/); // 주소 우선
+    if (h) { s.menu = h[1]; s.view = h[2]; }
+    if (s.view) view = s.view;
+    if (s.fxPeriod) fxPeriod = s.fxPeriod;
+    if (s.travelView) travelView = s.travelView;
+    if (s.mView && typeof mView !== "undefined") mView = s.mView;
+    $("calendarView").classList.toggle("hidden", view !== "calendar");
+    $("listView").classList.toggle("hidden", view !== "list");
+    $("chartView").classList.toggle("hidden", view !== "chart");
+    $("fixedView").classList.toggle("hidden", view !== "fixed");
+    document.querySelectorAll("#sideNav .side-item").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+    if (s.menu && s.menu !== "ledger") {
+      window.__bootRestoring = true; // 복원 중에는 메뉴 진입 시 첫 항목 강제 안 함
+      document.querySelector(`#mainMenu [data-menu="${s.menu}"]`)?.click();
+      window.__bootRestoring = false;
+    }
+    delete document.documentElement.dataset.bootview; // 부팅용 임시 감춤 해제 (정식 전환 완료)
+    delete document.documentElement.dataset.bootmenu;
+  } catch (e) {}
+  document.documentElement.classList.remove("booting"); // 화면 전환 끝 — 이제 그린다
 
   // 도우미(가계부실행) 모드: 같은 폴더의 DB를 자동으로 읽고 저장 — 선택/권한 전혀 불필요
   if (httpMode) {
@@ -4062,24 +5319,30 @@ async function initApp() {
     render();
     return;
   }
-  // GitHub 공유 모드: 연결돼 있으면 파일 선택 없이 저장소에서 바로 불러옴
+  // GitHub 공유 모드: 캐시를 즉시 보여주고, 뒤에서 최신 데이터로 동기화 (빠른 첫 화면)
   if (ghActive()) {
-    fileState("☁ GitHub 불러오는 중…");
     $("connectOverlay").classList.add("hidden");
+    let hasCache = false;
     try {
-      const ok = await ghLoad();
-      if (!ok) fileState(`☁ ${ghCfg.owner}/${ghCfg.repo} · 파일 없음 — 첫 저장 때 만들어져요`);
-    } catch (e) {
-      console.error(e);
-      // 실패 시 캐시로 표시
-      try {
-        const c = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-        entries = c.entries || []; budgets = c.budgets || {}; fixedItems = c.fixed || [];
-        monthStarts = c.starts || {}; travelTrips = c.tvT || []; travelItems = c.tvI || [];
-      } catch (e2) {}
-      fileState("⚠ GitHub 불러오기 실패 — 인터넷/토큰 확인 (캐시 표시 중)");
-    }
+      const c = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      if (c.entries && c.entries.length) {
+        entries = c.entries; budgets = c.budgets || {}; fixedItems = c.fixed || [];
+        monthStarts = c.starts || {}; travelTrips = c.tvT || []; travelItems = c.tvI || []; stocks = c.stk || []; savings = c.sav || []; pension = c.pen || []; estates = c.est || []; loans = c.loan || []; regionTx = c.rtx || [];
+        hasCache = true;
+        const latest = entries.reduce((a, e) => e.date > a ? e.date : a, "");
+        if (latest) curMonth = new Date(+latest.slice(0, 4), +latest.slice(5, 7) - 1, 1);
+      }
+    } catch (e) {}
     render();
+    fileState(hasCache ? "☁ 동기화 중…" : "☁ GitHub 불러오는 중…");
+    ghLoadPrices().catch(() => {}); // 주식 시세는 백그라운드로
+    ghLoad(hasCache).then(ok => {
+      render();
+      if (!ok) fileState(`☁ ${ghCfg.owner}/${ghCfg.repo} · 파일 없음 — 첫 저장 때 만들어져요`);
+    }).catch(e => {
+      console.error(e);
+      fileState(hasCache ? "⚠ 동기화 실패 — 캐시 표시 중 (인터넷/토큰 확인)" : "⚠ GitHub 불러오기 실패 — 인터넷/토큰 확인");
+    });
     return;
   }
 
@@ -4092,7 +5355,7 @@ async function initApp() {
       try {
         const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
         if (Array.isArray(raw)) { entries = raw; }
-        else { entries = raw.entries || []; budgets = raw.budgets || {}; fixedItems = raw.fixed || []; monthStarts = raw.starts || {}; travelTrips = raw.tvT || []; travelItems = raw.tvI || []; }
+        else { entries = raw.entries || []; budgets = raw.budgets || {}; fixedItems = raw.fixed || []; monthStarts = raw.starts || {}; travelTrips = raw.tvT || []; travelItems = raw.tvI || []; stocks = raw.stk || []; savings = raw.sav || []; pension = raw.pen || []; estates = raw.est || []; loans = raw.loan || []; regionTx = raw.rtx || []; }
       } catch { entries = []; }
       $("connectOverlay").classList.add("hidden");
       fileState("브라우저 저장 모드");
@@ -4142,6 +5405,7 @@ async function initApp() {
           monthStarts = c.starts || {};
           travelTrips = c.tvT || [];
           travelItems = c.tvI || [];
+          stocks = c.stk || []; savings = c.sav || []; pension = c.pen || []; estates = c.est || []; loans = c.loan || []; regionTx = c.rtx || [];
         } catch (e2) { entries = []; budgets = {}; }
         const latest = entries.reduce((a, e) => e.date > a ? e.date : a, "");
         if (latest) curMonth = new Date(+latest.slice(0, 4), +latest.slice(5, 7) - 1, 1);
@@ -4282,7 +5546,7 @@ function mRenderMore() {
 }
 function mOpenSheet(e) { // e 있으면 수정, 없으면 새 입력
   const isEdit = !!e;
-  const d = e ? { ...e } : { type: "exp", date: mView === "cal" ? mDay : todayStr(), who: "슬구", cat: "", title: "", amount: 0 };
+  const d = e ? { ...e } : { type: "exp", date: mView === "cal" ? mDay : todayStr(), who: lastWho(), cat: "", title: "", amount: 0 };
   $("mSheetWrap").classList.remove("hidden");
   $("mSheet").innerHTML = `
     <div class="mtype">
@@ -4293,7 +5557,7 @@ function mOpenSheet(e) { // e 있으면 수정, 없으면 새 입력
     <div class="fld"><label>내용</label><input id="mTitleIn" value="${esc(d.title || "")}" placeholder="예: 점심"></div>
     <div style="display:flex;gap:8px">
       <div class="fld" style="flex:1"><label>날짜</label><input id="mDate" inputmode="numeric" value="${d.date}" placeholder="260911, 9/11"></div>
-      <div class="fld" style="width:92px"><label>누구</label><select id="mWho">${["슬구", "쩡이"].map(w => `<option${d.who === w ? " selected" : ""}>${w}</option>`).join("")}</select></div>
+      <div class="fld" style="width:92px"><label>멤버</label><select id="mWho">${["슬구", "쩡이", "현금"].map(w => `<option${d.who === w ? " selected" : ""}>${w}</option>`).join("")}</select></div>
     </div>
     <div class="fld"><label>카테고리</label><select id="mCat">${catOptions(d.type, d.cat || DEFAULT_CATS[d.type][0])}</select></div>
     <div style="display:flex;gap:8px;margin-top:6px">
@@ -4304,7 +5568,7 @@ function mOpenSheet(e) { // e 있으면 수정, 없으면 새 입력
   const setType = (t) => { d.type = t; $("mTexp").className = t === "exp" ? "on-exp" : ""; $("mTinc").className = t === "inc" ? "on-inc" : ""; $("mCat").innerHTML = catOptions(t, null); };
   $("mTexp").addEventListener("click", () => setType("exp"));
   $("mTinc").addEventListener("click", () => setType("inc"));
-  $("mAmt").addEventListener("input", () => { const raw = $("mAmt").value.replace(/[^\d]/g, ""); $("mAmt").value = raw ? Number(raw).toLocaleString("ko-KR") : ""; });
+  bindAmountInput($("mAmt"));
   $("mCancel").addEventListener("click", mCloseSheet);
   $("mSheetWrap").addEventListener("click", (ev) => { if (ev.target.id === "mSheetWrap") mCloseSheet(); }, { once: true });
   if (isEdit) $("mDel").addEventListener("click", async () => {
@@ -4335,7 +5599,7 @@ function mOpenSheet(e) { // e 있으면 수정, 없으면 새 입력
 }
 function mCloseSheet() { $("mSheetWrap").classList.add("hidden"); }
 $("mAddBtn").addEventListener("click", () => mOpenSheet(null));
-document.querySelectorAll("#mTabs button").forEach(b => b.addEventListener("click", () => { mView = b.dataset.mv; mRender(); }));
+document.querySelectorAll("#mTabs button").forEach(b => b.addEventListener("click", () => { mView = b.dataset.mv; saveUiState(); mRender(); }));
 $("mPrev").addEventListener("click", () => { mMonth = monthKeyShift(mMonth, -1); mDay = mMonth + "-01"; mRender(); });
 $("mNext").addEventListener("click", () => { mMonth = monthKeyShift(mMonth, 1); mDay = mMonth + "-01"; mRender(); });
 $("mToday").addEventListener("click", () => { mMonth = ym(new Date()); mDay = todayStr(); mRender(); });
