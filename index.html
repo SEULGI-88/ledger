@@ -146,11 +146,18 @@
   .day-tag { display:inline-block; font-size:10.5px; background:var(--accent-soft); color:var(--accent);
              border-radius:5px; padding:1px 7px; margin-left:6px; font-weight:600; }
   .day-tag.hol { background:var(--exp-soft); color:var(--exp); }
-  .tv-band { font-size:10px; color:#fff; border-radius:4px; padding:1px 5px; margin-bottom:2px;
-             overflow:hidden; white-space:nowrap; text-overflow:ellipsis; opacity:.92; }
+  /* 여행 띠 — 셀 경계를 넘어 이음새 없이 연속으로 (구글 캘린더식) */
+  .tv-band { font-size:10px; line-height:15px; color:#fff; border-radius:0; padding:0 5px; margin:0 -15px 2px -15px;
+             overflow:hidden; white-space:nowrap; text-overflow:ellipsis; opacity:.94; position:relative; z-index:1; cursor:pointer; }
+  .tv-band.bl { margin-left:0; border-top-left-radius:8px; border-bottom-left-radius:8px; }
+  .tv-band.br { margin-right:0; border-top-right-radius:8px; border-bottom-right-radius:8px; }
+  .tv-band.sel { filter:brightness(.72); font-weight:700; z-index:3; } /* 선택된 띠 = 전체 어둡게 (칸 경계선 안 생기게) */
+  .tv-band-empty { height:15px; margin-bottom:2px; } /* 레인 자리맞춤 (빈 줄) */
+  #tvCalGrid .cal-day { overflow:visible; height:auto; min-height:74px; } /* 여행 많으면 그 줄이 늘어나고 페이지가 스크롤 */
   #tvMap { height:660px; }
   #tvCalGrid .cal-day { user-select:none; -webkit-user-select:none; }
   #tvCalGrid .cal-day.tv-selected { border-color:var(--accent); box-shadow:inset 0 0 0 2px var(--accent); background:var(--accent-hover); }
+  .tv-pin-marker { background:none !important; border:none !important; filter:drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
   .tv-pin-label { background:rgba(15,20,35,.78); color:#fff; border:none; box-shadow:none;
                   font-weight:700; font-size:12px; border-radius:6px; padding:2px 8px; }
   .tv-pin-label::before { display:none; }
@@ -190,8 +197,8 @@
   /* 목록 */
   .ledger-table { width:100%; border-collapse:collapse; font-size:13px; }
   .ledger-table td { overflow:hidden; text-overflow:ellipsis; } /* 고정 레이아웃 표에서 긴 내용 넘침 방지 */
-  .ledger-table tr.edit-row td { overflow:visible; } /* 편집 줄 입력칸은 잘리지 않게 */
-  .ledger-table tr.edit-row .er-title { width:100%; box-sizing:border-box; }
+  .ledger-table tr.edit-row td { overflow:hidden; padding:5px 6px; }
+  .ledger-table tr.edit-row select, .ledger-table tr.edit-row input { width:100%; box-sizing:border-box; min-width:0; } /* 편집칸 요소를 셀 폭에 맞춤 — 겹침 방지 */
   .ledger-table thead th { white-space:nowrap; } /* 헤더 셀렉트+정렬버튼 한 줄 유지 */
   #listView thead th, #fixedView thead th { padding-left:6px; padding-right:2px; }
   .ledger-table thead th .sel { width:auto; max-width:calc(100% - 18px); vertical-align:middle; }
@@ -228,6 +235,14 @@
   #chartGrid .chart-slot { display:flex; flex-direction:column; }
   #chartGrid .chart-slot.wide { grid-column:1/-1; }
   @media (max-width:820px) { #chartGrid { grid-template-columns:1fr; } }
+  #ctxMenu { position:fixed; z-index:1000; background:var(--card); border:1px solid var(--border); border-radius:10px;
+    box-shadow:0 8px 24px rgba(0,0,0,.18); padding:4px; min-width:150px; }
+  #ctxMenu .ctx-item { display:block; width:100%; text-align:left; border:none; background:none; cursor:pointer;
+    font-size:13px; color:inherit; padding:8px 12px; border-radius:6px; font-family:inherit; white-space:nowrap; }
+  #ctxMenu .ctx-item:hover { background:var(--accent-soft); }
+  #ctxMenu .ctx-item.danger { color:var(--exp); }
+  #ctxMenu .ctx-item.danger:hover { background:var(--exp-soft); }
+  #ctxMenu .ctx-sep { height:1px; background:var(--border); margin:4px 6px; }
   .drag-handle { cursor:grab; color:var(--muted); margin-right:6px; user-select:none; }
   .drag-handle:hover { color:var(--accent); }
   .chart-slot.dragging { opacity:.4; }
@@ -456,7 +471,7 @@ try {
   <div id="listView" class="hidden">
     <div class="card table-scroll">
       <table class="ledger-table" style="table-layout:fixed">
-        <colgroup><col style="width:100px"><col style="width:84px"><col style="width:84px"><col style="width:104px"><col><col style="width:116px"><col style="width:88px"><col style="width:64px"></colgroup>
+        <colgroup><col style="width:116px"><col style="width:96px"><col style="width:96px"><col style="width:170px"><col style="width:420px"><col style="width:140px"><col style="width:104px"><col style="width:80px"></colgroup>
         <thead><tr>
           <th class="sortable" data-sort="date" data-label="날짜">날짜</th>
           <th><select id="lsTypeSel" class="sel" style="padding:3px 6px;font-size:11.5px;width:100%"></select> <button class="sort-btn" data-lsk="type" title="구분 정렬">↕</button></th>
@@ -531,6 +546,11 @@ try {
   </div>
 
   <div id="regionView" class="hidden">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span style="font-weight:700;font-size:13px">지역카드</span>
+      <button class="btn" id="regionCardAddBtn" style="padding:4px 12px">＋ 카드 추가</button>
+      <span style="font-size:11.5px;color:var(--muted)">카드 우클릭 = 이름 변경·삭제</span>
+    </div>
     <div class="stats" id="regionCards" style="margin-bottom:12px"></div>
     <div class="card table-scroll">
       <table class="ledger-table">
@@ -723,7 +743,7 @@ try {
 /* ═══════════ 데이터 ═══════════ */
 const STORAGE_KEY = "ledger-v1";
 const DEFAULT_CATS = {
-  exp: ["장보기", "배달", "외식", "카페/간식", "교통", "주거/관리비", "통신", "쇼핑", "의료/건강", "미용", "문화/여가", "구독", "경조사", "여민전", "대전사랑카드", "기타"],
+  exp: ["장보기", "배달", "외식", "카페/간식", "교통", "주거/관리비", "통신", "쇼핑", "의료/건강", "미용", "문화/여가", "구독", "경조사", "기타"],
   inc: ["입금", "추가입금", "이자", "급여", "기타"]
 };
 // 매년 반복 기념일 ("MM-DD": 표시명) — 달력에 표시됨
@@ -793,7 +813,14 @@ let pension = []; // 퇴직연금: {id, who, kind(ETF/채권/예금), name, code
 let estates = []; // 부동산: {id, name, buy(매입가), now(현재시세), memo} — 엑셀 "부동산" 시트
 let loans = []; // 대출: {id, name, balance(잔액), rate(금리%), monthly(월상환), memo} — 엑셀 "대출" 시트
 let regionTx = []; // 지역카드 내역: {id, card(카드명), who(멤버), date, type("충전"|"사용"), title, amount} — 엑셀 "지역카드" 시트
-const REGION_CARDS = ["여민전", "대전사랑카드"]; // 지역카드 종류
+let regionCards = ["여민전", "온통대전"]; // 지역카드 종류 (추가·이름변경 가능, 엑셀 "지역카드목록" 시트)
+function regionCatToCard(cat) { // 생활비 카테고리 → 지역카드명 (없으면 null)
+  if (!cat) return null;
+  const m = String(cat).match(/^지역카드\((.+)\)$/);
+  if (m) return m[1];
+  if (regionCards.includes(cat) || cat === "대전사랑카드") return cat; // 구형 데이터 호환
+  return null;
+}
 let budgets = {};   // {"YYYY-MM": 시작예산(원)} — 엑셀 "예산" 시트로 저장
 let curMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let view = "list"; // 기본 = 사이드바 첫 항목(생활비)
@@ -950,7 +977,7 @@ function b64FromBytes(bytes) {
   return btoa(s);
 }
 function mirrorToLocal() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx })); } catch (e) {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx, rc: regionCards })); } catch (e) {}
 }
 async function ghLoad(keepMonth) { // true 반환 = 불러옴, false = 저장소에 파일 없음
   const res = await fetch(ghApiUrl() + "?ref=" + (ghCfg.branch || "main") + "&t=" + Date.now(), { headers: ghHeaders(), cache: "no-store" });
@@ -959,8 +986,9 @@ async function ghLoad(keepMonth) { // true 반환 = 불러옴, false = 저장소
   const j = await res.json();
   ghSha = j.sha;
   const bin = Uint8Array.from(atob(String(j.content || "").replace(/\n/g, "")), c => c.charCodeAt(0));
-  const { all, budgets: b, starts, fixed, tvTrips, tvItems, stocks: stk, savings: sav, pension: pen, estates: est, loans: lo, regionTx: rtx } = await fileToEntries(ghCfg.path || "가계부DB.xlsx", bin.buffer);
-  entries = all; budgets = b || {}; monthStarts = starts || {}; fixedItems = fixed || []; travelTrips = tvTrips || []; travelItems = tvItems || []; stocks = stk || []; savings = sav || []; pension = pen || []; estates = est || []; loans = lo || []; regionTx = rtx || [];
+  const { all, budgets: b, starts, fixed, tvTrips, tvItems, stocks: stk, savings: sav, pension: pen, estates: est, loans: lo, regionTx: rtx, regionCards: rc } = await fileToEntries(ghCfg.path || "가계부DB.xlsx", bin.buffer);
+  entries = all; budgets = b || {}; monthStarts = starts || {}; fixedItems = fixed || []; travelTrips = tvTrips || []; travelItems = tvItems || []; stocks = stk || []; savings = sav || []; pension = pen || []; estates = est || []; loans = lo || []; regionTx = rtx || []; if (rc && rc.length) regionCards = rc;
+  initUndoBaseline();
   if (!keepMonth) {
     const latest = entries.reduce((a, e) => e.date > a ? e.date : a, "");
     if (latest) curMonth = new Date(+latest.slice(0, 4), +latest.slice(5, 7) - 1, 1);
@@ -1001,7 +1029,34 @@ async function ghWrite() {
 }
 
 /* 저장: 엑셀 파일에 직접 (디바운스). FSA 미지원 브라우저는 localStorage 폴백 */
+/* ═══════════ 되돌리기 (Ctrl/Cmd+Z) — 저장 직전 상태를 쌓아 복원 ═══════════ */
+let undoStack = [], committedSnap = null, undoing = false;
+function snapshotData() {
+  return JSON.stringify({ entries, budgets, monthStarts, fixedItems, travelTrips, travelItems, stocks, savings, pension, estates, loans, regionTx, regionCards });
+}
+function restoreData(s) {
+  const d = JSON.parse(s);
+  entries = d.entries || []; budgets = d.budgets || {}; monthStarts = d.monthStarts || {};
+  fixedItems = d.fixedItems || []; travelTrips = d.travelTrips || []; travelItems = d.travelItems || [];
+  stocks = d.stocks || []; savings = d.savings || []; pension = d.pension || []; estates = d.estates || []; loans = d.loans || []; regionTx = d.regionTx || []; if (d.regionCards) regionCards = d.regionCards;
+}
+function initUndoBaseline() { committedSnap = snapshotData(); undoStack = []; }
+function doUndo() {
+  if (!undoStack.length) { toast("되돌릴 게 없어요"); return; }
+  undoing = true;
+  restoreData(undoStack.pop());
+  committedSnap = snapshotData();
+  save();
+  render();
+  if (mainMenu === "travel") renderTravel(); else if (mainMenu === "savings") updateSavingsPh();
+  undoing = false;
+  toast("되돌렸어요 (⌘Z)");
+}
 function save() {
+  if (!undoing) { // 변경 직전 상태를 되돌리기 스택에 저장
+    if (committedSnap !== null) { undoStack.push(committedSnap); if (undoStack.length > 30) undoStack.shift(); }
+    committedSnap = snapshotData();
+  }
   if (viewOnly) {
     fileState(`👁 ${fileHandle ? fileHandle.name : DB_NAME} · 보기 전용 (변경은 저장 안 됨)`);
     return;
@@ -1021,12 +1076,12 @@ function save() {
   }
   if (fsMode && fileHandle) {
     // 빠른 표시용 미러 (다음 실행 때 연결 전에도 데이터가 바로 보이게)
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx })); } catch (e) {}
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx, rc: regionCards })); } catch (e) {}
     fileState("저장 중…");
     clearTimeout(writeTimer);
     writeTimer = setTimeout(writeToFile, 500);
   } else {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx, rc: regionCards }));
   }
 }
 
@@ -1235,6 +1290,13 @@ function buildXlsx() {
     fileList.push([`xl/worksheets/sheet${idx}.xml`,
       enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${tb}</sheetData></worksheet>`)]);
     sheetRefs.push({ mon: "시세", idx });
+  }
+  if (regionCards.length) { // 지역카드목록 시트: 카드 이름들 (거래 없어도 저장)
+    const idx = sheetRefs.length + 1;
+    let tb = `<row r="1">` + S("A1", "카드", 3) + `</row>`;
+    regionCards.forEach((c, i) => { tb += `<row r="${i + 2}">` + S("A" + (i + 2), c) + `</row>`; });
+    fileList.push([`xl/worksheets/sheet${idx}.xml`, enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${tb}</sheetData></worksheet>`)]);
+    sheetRefs.push({ mon: "지역카드목록", idx });
   }
   if (regionTx.length) { // 지역카드 시트: 카드/날짜/구분/내용/금액
     const idx = sheetRefs.length + 1;
@@ -1468,6 +1530,11 @@ function render() {
   const total = entries.length;
   $("statusLeft").textContent = total ? `전체 ${total.toLocaleString()}건 기록` : "";
   if (typeof IS_MOBILE !== "undefined" && IS_MOBILE) mRender(); // 모바일 화면도 같이 갱신
+  // 데이터가 늦게 로드돼도 현재 열려 있는 다른 메뉴(여행·재테크)를 다시 그려줌
+  if (typeof mainMenu !== "undefined") {
+    if (mainMenu === "travel") { try { renderTravel(); } catch (e) {} }
+    else if (mainMenu === "savings") { try { updateSavingsPh(); } catch (e) {} }
+  }
 }
 
 /* 시작예산 체인 계산 — 원본 엑셀 수식과 동일:
@@ -1702,8 +1769,15 @@ function bindDropTarget(el, onDrop) {
 }
 
 /* 행 내 직접 입력/수정 에디터 */
+function catList(type) { // 카테고리 목록 — 지출에는 지역카드(…) 자동 포함
+  const base = [...DEFAULT_CATS[type]];
+  if (type !== "exp") return base;
+  const idx = base.indexOf("기타");
+  const region = regionCards.map(c => `지역카드(${c})`);
+  return idx >= 0 ? [...base.slice(0, idx), ...region, "기타"] : [...base, ...region];
+}
 function catOptions(type, cur) {
-  const list = [...DEFAULT_CATS[type]];
+  const list = catList(type);
   if (cur && !list.includes(cur)) list.push(cur);
   return list.map(c => `<option${c === cur ? " selected" : ""}>${esc(c)}</option>`).join("");
 }
@@ -1847,7 +1921,7 @@ function renderList() {
   const whos = [...new Set(["슬구", "쩡이", "현금"].concat(entries.map(e => e.who).filter(Boolean)))];
   $("lsWhoSel").innerHTML = `<option value="">멤버</option>` +
     whos.map(w => `<option value="${esc(w)}"${whoFilter === w ? " selected" : ""}>${esc(w)}</option>`).join("");
-  const lcats = [...new Set(DEFAULT_CATS.exp.concat(DEFAULT_CATS.inc).concat(entries.map(e => e.cat).filter(Boolean)))];
+  const lcats = [...new Set(catList("exp").concat(DEFAULT_CATS.inc).concat(entries.map(e => e.cat).filter(Boolean)))];
   $("lsCatSel").innerHTML = `<option value="">카테고리</option>` +
     lcats.map(c => `<option value="${esc(c)}"${catFilter === c ? " selected" : ""}>${esc(c)}</option>`).join("");
   $("lsSettleSel").innerHTML = [["all", "정산"], ["undone", "미정산"], ["done", "정산완료"]]
@@ -2331,8 +2405,8 @@ function setType(t) {
 }
 function refreshCatList() {
   const cur = $("inCat").value;
-  $("inCat").innerHTML = DEFAULT_CATS[entryType].map(c => `<option>${c}</option>`).join("");
-  if (cur && DEFAULT_CATS[entryType].includes(cur)) $("inCat").value = cur;
+  $("inCat").innerHTML = catList(entryType).map(c => `<option>${esc(c)}</option>`).join("");
+  if (cur && catList(entryType).includes(cur)) $("inCat").value = cur;
 }
 /* 목록에 없는 값(과거 데이터 등)은 옵션으로 추가해서 수정 시 값이 안 바뀌게 보존 */
 function ensureSelOption(sel, val) {
@@ -2644,6 +2718,7 @@ async function fileToEntries(nameOrFile, buf) {
   const foundEstates = [];
   const foundLoans = [];
   const foundRegionTx = [];
+  let foundRegionCards = null;
   let skipped = 0, badSheets = [];
   for (const s of sheetList) {
     // 여행 시트
@@ -2676,6 +2751,10 @@ async function fileToEntries(nameOrFile, buf) {
         else { const p = Number(String(r[1] ?? "").replace(/,/g, "")); if (p > 0) snap.prices[k] = p; }
       }
       if (Object.keys(snap.prices).length && !(stockPrices.updated && stockPrices.updated > (snap.updated || ""))) stockPrices = snap;
+      continue;
+    }
+    if (s.name.trim() === "지역카드목록") {
+      foundRegionCards = s.rows.slice(1).map(r => String(r[0] ?? "").trim()).filter(Boolean);
       continue;
     }
     if (s.name.trim() === "지역카드") {
@@ -2899,13 +2978,13 @@ async function fileToEntries(nameOrFile, buf) {
     const monthly = foundFixed.filter(i => normFxPeriod(i.period || "월") === "월");
     if (monthly.length && monthly.every(i => i.pin === true)) monthly.forEach(i => delete i.pin);
   }
-  return { all, skipped, badSheets, budgets: foundBudgets, starts: foundStarts, fixed: foundFixed, tvTrips: foundTvTrips, tvItems: foundTvItems, stocks: foundStocks, savings: foundSavings, pension: foundPension, estates: foundEstates, loans: foundLoans, regionTx: foundRegionTx, legacy: monthSheets.length > 0 };
+  return { all, skipped, badSheets, budgets: foundBudgets, starts: foundStarts, fixed: foundFixed, tvTrips: foundTvTrips, tvItems: foundTvItems, stocks: foundStocks, savings: foundSavings, pension: foundPension, estates: foundEstates, loans: foundLoans, regionTx: foundRegionTx, regionCards: foundRegionCards, legacy: monthSheets.length > 0 };
 }
 
 async function importFile(file) {
   try {
     const buf = await file.arrayBuffer();
-    const { all: imported, skipped, budgets: importedBudgets, starts: importedStarts, fixed: importedFixed, tvTrips: importedTvT, tvItems: importedTvI, stocks: importedStk, savings: importedSav, pension: importedPen, estates: importedEst, loans: importedLo, regionTx: importedRtx } = await fileToEntries(file.name, buf);
+    const { all: imported, skipped, budgets: importedBudgets, starts: importedStarts, fixed: importedFixed, tvTrips: importedTvT, tvItems: importedTvI, stocks: importedStk, savings: importedSav, pension: importedPen, estates: importedEst, loans: importedLo, regionTx: importedRtx, regionCards: importedRc } = await fileToEntries(file.name, buf);
     if (!imported.length) throw new Error("가져올 수 있는 행이 없습니다 (날짜/금액 컬럼 확인)");
 
     const merge = entries.length === 0 ||
@@ -2936,6 +3015,7 @@ async function importFile(file) {
     if (importedEst && importedEst.length) estates = importedEst;
     if (importedLo && importedLo.length) loans = importedLo;
     if (importedRtx && importedRtx.length) regionTx = importedRtx;
+    if (importedRc && importedRc.length) regionCards = importedRc;
     if (importedStarts) { for (const k of Object.keys(importedStarts)) { if (!monthStarts[k]) monthStarts[k] = importedStarts[k]; } }
     save();
     const latest = entries.reduce((a, e) => e.date > a ? e.date : a, "0000");
@@ -3568,23 +3648,33 @@ async function ghTriggerPrices() { // 종목이 바뀌면 시세 수집을 즉�
 
 /* ═══════════ 가계부 · 지역카드 (여민전·대전사랑카드 잔액 관리) ═══════════ */
 function regionAll() { // 생활비의 지역카드 지출(→자동 충전) + 직접 입력한 지역카드 내역
-  const autos = entries.filter(e => e.type === "exp" && REGION_CARDS.includes(e.cat))
-    .map(e => ({ id: "auto-" + e.id, card: e.cat, who: e.who, date: e.date, type: "충전", title: e.title || "충전", amount: e.amount, auto: true }));
+  const autos = entries.filter(e => e.type === "exp" && regionCatToCard(e.cat))
+    .map(e => ({ id: "auto-" + e.id, card: regionCatToCard(e.cat), who: e.who, date: e.date, type: "충전", title: e.title || "충전", amount: e.amount, auto: true }));
   return autos.concat(regionTx);
 }
 function renderRegion() {
   const fmt = (n) => Math.round(n).toLocaleString();
   const all = regionAll();
-  const cards = [...new Set(REGION_CARDS.concat(all.map(t => t.card).filter(Boolean)))];
+  const cards = [...new Set(regionCards.concat(all.map(t => t.card).filter(Boolean)))];
   const bal = {};
   cards.forEach(c => bal[c] = { charge: 0, use: 0 });
   all.forEach(t => { if (!bal[t.card]) bal[t.card] = { charge: 0, use: 0 }; bal[t.card][t.type === "충전" ? "charge" : "use"] += t.amount || 0; });
   $("regionCards").innerHTML = cards.map(c => {
     const b = bal[c], remain = b.charge - b.use;
-    return `<div class="stat"><div class="label">${esc(c)} 남은 금액</div>
+    return `<div class="stat" data-card="${esc(c)}" style="cursor:context-menu" title="우클릭: 이름 변경·삭제"><div class="label">${esc(c)} 남은 금액</div>
       <div class="value ${remain >= 0 ? "inc" : "exp"}">${fmt(remain)}원</div>
       <div style="font-size:11px;color:var(--muted);margin-top:2px">충전 ${fmt(b.charge)} · 사용 ${fmt(b.use)}</div></div>`;
   }).join("");
+  $("regionCards").querySelectorAll(".stat[data-card]").forEach(el => {
+    el.addEventListener("contextmenu", (ev) => {
+      ev.preventDefault();
+      const name = el.dataset.card;
+      showCtxMenu(ev.clientX, ev.clientY, [
+        { label: `✎ 이름 변경 · ${name}`, onClick: () => regionRenameCard(name) },
+        { label: `🗑 카드 삭제 · ${name}`, danger: true, onClick: () => regionDeleteCard(name) }
+      ]);
+    });
+  });
   // 카드별 그룹 → 최신순 내역
   const tx = [...all].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   if (!tx.length) { $("regionBody").innerHTML = `<tr><td colspan="7"><div class="empty">내역이 없습니다 — 생활비에서 여민전·대전사랑카드로 지출하면 자동 충전되고, ＋ 추가로 사용 내역을 기록하세요</div></td></tr>`; return; }
@@ -3611,7 +3701,7 @@ function regionRowHtml(t) {
     <td>${t.auto ? "" : `<div class="row-act"><button class="edit" title="수정">✎</button><button class="del" title="삭제">🗑</button></div>`}</td></tr>`;
 }
 function regionEditorHtml(t) {
-  const cards = [...new Set(REGION_CARDS.concat(regionTx.map(x => x.card).filter(Boolean)))];
+  const cards = [...new Set(regionCards.concat(regionTx.map(x => x.card).filter(Boolean)))];
   return `<tr class="edit-row" data-rid="${t.id || ""}">
     <td><select class="rg-card">${cards.map(c => `<option${(t.card || cards[0]) === c ? " selected" : ""}>${esc(c)}</option>`).join("")}</select></td>
     <td><select class="rg-who">${["쩡이", "슬구", "현금"].map(w => `<option${(t.who || lastWho()) === w ? " selected" : ""}>${w}</option>`).join("")}</select></td>
@@ -3658,7 +3748,38 @@ function bindRegionRows() {
     tr.addEventListener("dblclick", (ev) => { if (!ev.target.closest("input,button,select")) openEdit(); });
   });
 }
+async function regionAddCard() {
+  const v = await uiPrompt("지역카드 이름을 입력하세요<br><span style='color:var(--muted);font-size:12px'>예: 제주도, 온누리상품권</span>", "", "지역카드 추가");
+  if (v === null) return;
+  const name = String(v).trim();
+  if (!name) return;
+  if (regionCards.includes(name)) { toast("이미 있는 카드예요"); return; }
+  regionCards.push(name);
+  save(); renderRegion();
+  toast(`${esc(name)} 카드를 추가했어요 — 생활비 카테고리에 '지역카드(${esc(name)})'가 생겼어요`);
+}
+async function regionRenameCard(oldName) {
+  const v = await uiPrompt("새 이름을 입력하세요", oldName, "카드 이름 변경");
+  if (v === null) return;
+  const name = String(v).trim();
+  if (!name || name === oldName) return;
+  const i = regionCards.indexOf(oldName);
+  if (i >= 0) regionCards[i] = name; else regionCards.push(name);
+  // 기존 데이터(내역·생활비 카테고리)도 새 이름으로
+  regionTx.forEach(t => { if (t.card === oldName) t.card = name; });
+  entries.forEach(e => { if (e.cat === `지역카드(${oldName})` || e.cat === oldName) e.cat = `지역카드(${name})`; });
+  save(); renderRegion();
+  toast(`${esc(oldName)} → ${esc(name)}로 바꿨어요`);
+}
+async function regionDeleteCard(name) {
+  const used = regionTx.filter(t => t.card === name).length + entries.filter(e => regionCatToCard(e.cat) === name).length;
+  if (!await uiConfirm(`<b>${esc(name)}</b> 카드를 삭제할까요?${used ? `<br><span style='color:var(--muted)'>관련 내역 ${used}건은 그대로 남아요 (카드 목록에서만 제거)</span>` : ""}`, { title: "카드 삭제", ok: "삭제" })) return;
+  regionCards = regionCards.filter(c => c !== name);
+  save(); renderRegion();
+  toast("카드를 삭제했어요");
+}
 document.addEventListener("DOMContentLoaded", () => {
+  $("regionCardAddBtn")?.addEventListener("click", regionAddCard);
   $("regionAddBtn")?.addEventListener("click", () => {
     if ($("regionBody").querySelector('.edit-row[data-rid=""]')) return;
     if ($("regionBody").querySelector(".edit-row")) renderRegion();
@@ -4142,16 +4263,31 @@ function renderTravel() {
 
 /* 여행 지도 — 온라인이면 위성지도(Leaflet+Esri), 오프라인이면 윤곽 지도(d3). 핀 고정 = 우클릭 */
 let tvLeaflet = null;
-function tvSetPin(lat, lng) {
-  const tid = $("tvPinTrip").value;
-  if (!tid) { toast("먼저 위에서 핀 찍을 여행을 선택하세요"); return false; }
-  const t = tripById(tid);
-  if (!t) return false;
-  t.lat = Math.round(lat * 1000) / 1000;
-  t.lng = Math.round(lng * 1000) / 1000;
-  save();
-  toast(`${t.name} 핀을 고정했어요`);
-  return true;
+function tvPinIcon(color) { // 압정(📌) 모양 마커 — 둥근 머리 + 뾰족한 긴 바늘
+  const c = esc(color || "#e34948");
+  return L.divIcon({
+    className: "tv-pin-marker",
+    html: `<svg width="30" height="44" viewBox="0 0 30 44">
+      <path d="M15 42 L11 22 L19 22 Z" fill="#9aa0a8" stroke="#6b7078" stroke-width="1"/>
+      <circle cx="15" cy="13" r="11" fill="${c}" stroke="#fff" stroke-width="2.5"/>
+      <circle cx="11" cy="9.5" r="3" fill="rgba(255,255,255,.6)"/>
+    </svg>`,
+    iconSize: [30, 44], iconAnchor: [15, 42], tooltipAnchor: [0, -40]
+  });
+}
+function tvPinMenu(x, y, lat, lng) { // 우클릭 위치에서 여행 선택 → 그 지점에 핀
+  const trips = tvVisibleTrips();
+  if (!trips.length) { toast("먼저 여행을 추가하세요"); return; }
+  showCtxMenu(x, y, trips.map(t => ({
+    label: `📍 ${t.name}${t.lat != null ? " · 위치 옮기기" : ""}`,
+    onClick: () => {
+      t.lat = Math.round(lat * 1000) / 1000;
+      t.lng = Math.round(lng * 1000) / 1000;
+      save();
+      renderTravelMap();
+      toast(`${t.name} 핀을 찍었어요`);
+    }
+  })));
 }
 let mapLibsLoading = null; // 지도 라이브러리 지연 로드 (첫 지도 열 때 1회)
 function ensureMapLibs() {
@@ -4169,13 +4305,10 @@ function renderTravelMap() {
     ensureMapLibs().then(() => { if (travelView === "map") renderTravelMap(); });
     return;
   }
-  const sel = $("tvPinTrip");
-  const prevSel = sel.value;
+  const selEl = $("tvPinTrip");
+  if (selEl) selEl.style.display = "none"; // 이제 우클릭 메뉴로 선택 — 드롭다운 불필요
   fillTvYearSel($("tvYearSelMap"));
-  sel.innerHTML = `<option value="">핀 찍을 여행 선택…</option>` +
-    tvVisibleTrips().map(t => `<option value="${t.id}">${esc(tripLabel(t))}${t.lat != null ? " 📍" : ""}</option>`).join("");
-  sel.value = prevSel || "";
-  $("tvMapHint").textContent = "여행을 고른 뒤 지도에서 우클릭하면 핀이 고정돼요 · 휠 확대 / 드래그 이동";
+  $("tvMapHint").textContent = "지도에서 우클릭 → 여행을 고르면 그 위치에 핀이 찍혀요 · 휠 확대 / 드래그 이동";
   if (tvLeaflet) { tvLeaflet.remove(); tvLeaflet = null; }
   $("tvMap").innerHTML = "";
   if (typeof L !== "undefined" && navigator.onLine) {
@@ -4187,11 +4320,13 @@ function renderTravelMap() {
     L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 18, noWrap: true, attribution: "Esri World Imagery" }).addTo(map);
     L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", { maxZoom: 18, noWrap: true }).addTo(map);
     tvVisibleTrips().filter(t => t.lat != null && t.lng != null).forEach(t => {
-      const mk = L.circleMarker([t.lat, t.lng], { radius: 8, color: "#fff", weight: 2.5, fillColor: tripColor(t.id), fillOpacity: 1 }).addTo(map);
-      mk.bindTooltip(`${tripLabel(t)} · ${fmtWon(tripSum(t.id))}`, { permanent: true, direction: "top", offset: [0, -10], className: "tv-pin-label" });
-      mk.on("click", () => { tvSelected = t.id; travelView = "list"; renderTravel(); });
+      const mk = L.marker([t.lat, t.lng], { icon: tvPinIcon(tripColor(t.id)) }).addTo(map);
+      mk.bindTooltip(`${tripLabel(t)} · ${fmtWon(tripSum(t.id))}`, { permanent: true, direction: "top", offset: [0, -44], className: "tv-pin-label" });
     });
-    map.on("contextmenu", (e) => { if (tvSetPin(e.latlng.lat, e.latlng.lng)) renderTravelMap(); });
+    map.on("contextmenu", (e) => { // 우클릭 → 여행 선택 메뉴 → 그 위치에 핀
+      if (e.originalEvent) e.originalEvent.preventDefault();
+      tvPinMenu(e.originalEvent ? e.originalEvent.clientX : 0, e.originalEvent ? e.originalEvent.clientY : 0, e.latlng.lat, e.latlng.lng);
+    });
     const pts = tvVisibleTrips().filter(t => t.lat != null).map(t => [t.lat, t.lng]);
     if (pts.length) map.fitBounds(pts, { padding: [70, 70], maxZoom: 5 });
     return;
@@ -4216,11 +4351,15 @@ function renderTravelMap() {
     pinLayer.selectAll("*").remove();
     tvVisibleTrips().filter(t => t.lat != null && t.lng != null).forEach(t => {
       const [x, y] = proj([t.lng, t.lat]);
-      const grp = pinLayer.append("g").style("cursor", "pointer")
-        .on("click", (ev) => { ev.stopPropagation(); tvSelected = t.id; travelView = "list"; renderTravel(); });
-      grp.append("circle").attr("cx", x).attr("cy", y).attr("r", 7 / k)
-        .attr("fill", tripColor(t.id)).attr("stroke", "#fff").attr("stroke-width", 2 / k);
-      grp.append("text").attr("x", x).attr("y", y - 11 / k).attr("text-anchor", "middle")
+      const grp = pinLayer.append("g");
+      // 압정(핀) 모양 — 뾰족한 바늘 + 둥근 머리
+      const s = 1 / k;
+      grp.append("path").attr("d", `M${x} ${y} L${x - 4 * s} ${y - 20 * s} L${x + 4 * s} ${y - 20 * s} Z`)
+        .attr("fill", "#9aa0a8").attr("stroke", "#6b7078").attr("stroke-width", 1 * s);
+      grp.append("circle").attr("cx", x).attr("cy", y - 29 * s).attr("r", 11 * s)
+        .attr("fill", tripColor(t.id)).attr("stroke", "#fff").attr("stroke-width", 2.5 * s);
+      grp.append("circle").attr("cx", x - 4 * s).attr("cy", y - 32.5 * s).attr("r", 3 * s).attr("fill", "rgba(255,255,255,.6)");
+      grp.append("text").attr("x", x).attr("y", y - 44 / k).attr("text-anchor", "middle")
         .attr("font-size", 13 / k).attr("font-weight", 700).attr("fill", "#1f2430")
         .attr("stroke", "#fff").attr("stroke-width", 3 / k).attr("paint-order", "stroke")
         .text(t.name);
@@ -4238,7 +4377,7 @@ function renderTravelMap() {
     const tr = d3.zoomTransform(svg.node());
     const [mx, my] = d3.pointer(ev, svg.node());
     const [lng, lat] = proj.invert(tr.invert([mx, my]));
-    if (tvSetPin(lat, lng)) drawPins(curK);
+    tvPinMenu(ev.clientX, ev.clientY, lat, lng);
   });
 }
 document.querySelectorAll("#travelNav .side-item").forEach(b =>
@@ -4261,7 +4400,19 @@ function renderTravelCal() {
     <div class="stat"><div class="label">${tvMonth.getMonth() + 1}월 여행</div><div class="value" style="font-size:16px">${mTrips.length ? mTrips.map(t => esc(t.name)).join(" · ") : "없음"}</div></div>`;
   const firstDow = new Date(y, m, 1).getDay();
   const daysInMonth = new Date(y, m + 1, 0).getDate();
-  const ranges = travelTrips.map(t => ({ t, r: tripRange(t) })).filter(x => x.r);
+  // 여행별 레인(줄) 배정 — 겹치는 여행은 다른 줄에 (연속 띠가 셀을 가로질러 이어짐)
+  const ranges = travelTrips.map(t => ({ t, r: tripRange(t) })).filter(x => x.r)
+    .sort((a, b) => a.r[0].localeCompare(b.r[0]) || a.r[1].localeCompare(b.r[1]));
+  const laneEnd = [];
+  ranges.forEach(x => { let l = 0; while (laneEnd[l] && laneEnd[l] >= x.r[0]) l++; laneEnd[l] = x.r[1]; x.lane = l; });
+  // 각 주(가로 줄)에서 필요한 레인 수 계산 — 그 줄에 여행이 많으면 그 줄만 높아짐
+  const rowLanes = [0, 0, 0, 0, 0, 0];
+  for (let i = 0; i < 42; i++) {
+    const dn = i - firstDow + 1;
+    const cd2 = new Date(y, m, dn);
+    const k2 = `${cd2.getFullYear()}-${String(cd2.getMonth() + 1).padStart(2, "0")}-${String(cd2.getDate()).padStart(2, "0")}`;
+    ranges.forEach(x => { if (k2 >= x.r[0] && k2 <= x.r[1]) rowLanes[(i / 7) | 0] = Math.max(rowLanes[(i / 7) | 0], x.lane + 1); });
+  }
   let html = ["일", "월", "화", "수", "목", "금", "토"].map((n, i) =>
     `<div class="cal-dow ${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${n}</div>`).join("");
   for (let i = 0; i < 42; i++) {
@@ -4270,59 +4421,122 @@ function renderTravelCal() {
     const out = dayNum < 1 || dayNum > daysInMonth;
     const key = `${cd.getFullYear()}-${String(cd.getMonth() + 1).padStart(2, "0")}-${String(cd.getDate()).padStart(2, "0")}`;
     const dow = cd.getDay();
-    let inner = `<div class="d ${dow === 0 || dow === 6 ? "sun-n" : ""}">${cd.getDate()}</div>`;
-    ranges.forEach(({ t, r }) => {
-      if (key >= r[0] && key <= r[1]) {
-        const isStart = key === r[0] || cd.getDate() === 1;
-        inner += `<div class="tv-band" data-band="${t.id}" style="background:${tripColor(t.id)}" title="${esc(t.name)} ${fmtRange(r)} — 우클릭: 기간 수정·삭제">${isStart ? esc(t.name) : "&nbsp;"}</div>`;
-      }
-    });
+    const col = i % 7;
+    const hol = holidaysOfYear(cd.getFullYear())[key];
+    let inner = `<div class="d ${dow === 0 || dow === 6 || hol ? "sun-n" : ""}"${hol ? ` title="${esc(hol)}"` : ""}>${cd.getDate()}</div>`;
+    // 레인 순서대로 — 그 줄에 여행이 있으면 띠, 없으면 자리맞춤 빈칸 (그 주에 필요한 레인만)
+    for (let l = 0; l < rowLanes[(i / 7) | 0]; l++) {
+      const hit = ranges.find(x => x.lane === l && key >= x.r[0] && key <= x.r[1]);
+      if (!hit) { inner += `<div class="tv-band-empty"></div>`; continue; }
+      const { t, r } = hit;
+      const isStart = key === r[0], isEnd = key === r[1];
+      const roundL = isStart || col === 0;      // 주 시작이면 왼쪽도 둥글게(새 줄로 이어짐)
+      const roundR = isEnd || col === 6;
+      const showName = isStart || col === 0;    // 이름은 시작 또는 주 시작에 표시
+      inner += `<div class="tv-band${roundL ? " bl" : ""}${roundR ? " br" : ""}${t.id === tvSelBand ? " sel" : ""}" data-band="${t.id}" data-day="${key}" draggable="true" style="background:${tripColor(t.id)}" title="${esc(t.name)} ${fmtRange(r)} — 클릭: 선택 · 드래그: 이동 · 우클릭: 메뉴">${showName ? esc(t.name) : "&nbsp;"}</div>`;
+    }
     html += `<div class="cal-day ${out ? "out" : ""}" data-day="${key}">${inner}</div>`;
   }
   $("tvCalGrid").innerHTML = html;
   bindTvCalDrag();
   bindTvBands();
+  bindTvCalMenu();
   renderTvCalDetail();
 }
 /* 달력의 여행 띠: 좌클릭 = 아래에 내역 표시, 우클릭 = 수정/삭제 메뉴 */
 let tvCalTrip = null;
+let ctxOutside = null;
+function closeCtxMenu() {
+  const m = document.getElementById("ctxMenu"); if (m) m.remove();
+  if (ctxOutside) { document.removeEventListener("mousedown", ctxOutside, true); ctxOutside = null; }
+}
+function showCtxMenu(x, y, items) { // 마우스 옆에 뜨는 작은 컨텍스트 메뉴 (items: [{label, danger, onClick}])
+  closeCtxMenu();
+  const m = document.createElement("div");
+  m.id = "ctxMenu";
+  m.innerHTML = items.map((it, i) => it.sep ? `<div class="ctx-sep"></div>` : `<button class="ctx-item${it.danger ? " danger" : ""}" data-i="${i}">${esc(it.label)}</button>`).join("");
+  document.body.appendChild(m);
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.min(x, innerWidth - w - 8) + "px";
+  m.style.top = Math.min(y, innerHeight - h - 8) + "px";
+  m.querySelectorAll(".ctx-item").forEach(b => b.addEventListener("click", () => { const it = items[+b.dataset.i]; closeCtxMenu(); it.onClick && it.onClick(); }));
+  // 메뉴 바깥을 눌렀을 때만 닫기 (메뉴 안 클릭은 유지 — 항목 클릭이 먹히도록)
+  ctxOutside = (ev) => { if (!m.contains(ev.target)) closeCtxMenu(); };
+  setTimeout(() => document.addEventListener("mousedown", ctxOutside, true), 0);
+}
+function bindTvCalMenu() { // 달력 빈 칸 우클릭: 여행 추가 / 이름 변경 / 삭제
+  $("tvCalGrid").querySelectorAll(".cal-day").forEach(c => {
+    c.addEventListener("contextmenu", (ev) => {
+      if (ev.target.closest(".tv-band")) return; // 띠 우클릭은 기존 띠 메뉴가 처리
+      ev.preventDefault();
+      const day = c.dataset.day;
+      const here = travelTrips.filter(t => { const r = tripRange(t); return r && r[0] <= day && r[1] >= day; });
+      const sel = tvCalRange ? tvCalRange : (tvCalDay ? [tvCalDay, tvCalDay] : [day, day]);
+      const items = [{ label: "＋ 여행 추가", onClick: () => tvAddTripForRange(sel[0], sel[1]) }];
+      here.forEach(t => {
+        items.push({ sep: true });
+        items.push({ label: `✎ 이름 변경 · ${t.name}`, onClick: () => tvRenameTrip(t) });
+        items.push({ label: `🗑 삭제 · ${t.name}`, danger: true, onClick: async () => {
+          if (await uiConfirm(`<b>${esc(t.name)}</b> 여행과 전체 내역을 삭제할까요?`, { title: "여행 삭제", ok: "삭제" })) {
+            travelTrips = travelTrips.filter(x => x.id !== t.id);
+            travelItems = travelItems.filter(i => i.trip !== t.id);
+            if (tvSelected === t.id) tvSelected = null;
+            save(); renderTravel(); toast("삭제했어요");
+          }
+        } });
+      });
+      showCtxMenu(ev.clientX, ev.clientY, items);
+    });
+  });
+}
+let tvBandDrag = null; // 드래그 중인 여행 {id, grabDay}
+let tvSelBand = null; // 선택된 여행 띠 (trip id)
 function bindTvBands() {
   $("tvCalGrid").querySelectorAll(".tv-band[data-band]").forEach(b => {
-    // 좌클릭/드래그는 날짜와 동일하게 동작 (그날 내역 표시) — 우클릭만 여행 메뉴
-    b.addEventListener("contextmenu", async (ev) => {
+    // 띠 드래그로 여행 날짜 이동 (기간 유지)
+    b.addEventListener("dragstart", (ev) => {
+      tvBandDrag = { id: b.dataset.band, grabDay: b.closest(".cal-day")?.dataset.day };
+      ev.dataTransfer.effectAllowed = "move";
+      ev.stopPropagation();
+    });
+    b.addEventListener("dragend", () => { tvBandDrag = null; });
+    // 띠 좌클릭 = 그 띠(여행)를 선택 (날짜 선택 아님) — Backspace로 삭제 가능
+    b.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const t = tripById(b.dataset.band);
+      if (!t) return;
+      tvSelBand = tvSelBand === t.id ? null : t.id; // 다시 클릭하면 해제
+      tvCalDay = null; tvCalRange = null; // 날짜 선택은 해제
+      tvCalTrip = tvSelBand;
+      tvSelected = tvSelBand;
+      renderTravelCal();
+    });
+    // 우클릭 = 마우스 옆 메뉴
+    b.addEventListener("contextmenu", (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
       const t = tripById(b.dataset.band);
       if (!t) return;
-      const choice = await dialog({
-        title: `${t.name} (${fmtRange(tripRange(t))})`,
-        msg: "이 여행을 어떻게 할까요?",
-        buttons: [
-          { label: "닫기", value: "" },
-          { label: "삭제", value: "del" },
-          { label: "기간 수정", value: "range", primary: true }
-        ]
-      });
-      if (choice === "range") {
-        const cur = tripRange(t);
-        const v = await uiPrompt("여행 기간 (예: <b>2026-08-01 ~ 2026-08-03</b>)", cur ? `${cur[0]} ~ ${cur[1]}` : "", `${esc(t.name)} 기간 수정`);
-        if (v === null) return;
-        const mm2 = String(v).match(/(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})/);
-        if (!mm2) { toast("형식: 2026-08-01 ~ 2026-08-03"); return; }
-        t.start = mm2[1];
-        t.end = mm2[2];
-        save();
-        renderTravelCal();
-        toast("기간을 수정했어요");
-      } else if (choice === "del") {
-        if (!await uiConfirm(`<b>${esc(t.name)}</b> 여행과 내역 전체를 삭제할까요?`, { title: "여행 삭제", ok: "삭제" })) return;
-        travelTrips = travelTrips.filter(x => x.id !== t.id);
-        travelItems = travelItems.filter(i => i.trip !== t.id);
-        if (tvSelected === t.id) tvSelected = null;
-        save();
-        renderTravelCal();
-        toast("삭제했어요");
-      }
+      showCtxMenu(ev.clientX, ev.clientY, [
+        { label: `＋ 여행 추가` , onClick: () => tvAddTripForRange(tvCalRange ? tvCalRange[0] : (tvCalDay || b.closest(".cal-day")?.dataset.day), tvCalRange ? tvCalRange[1] : (tvCalDay || b.closest(".cal-day")?.dataset.day)) },
+        { sep: true },
+        { label: `✎ 이름 변경 · ${t.name}`, onClick: () => tvRenameTrip(t) },
+        { label: `📅 기간 수정 · ${t.name}`, onClick: async () => {
+          const cur = tripRange(t);
+          const v = await uiPrompt("여행 기간 (예: <b>2026-08-01 ~ 2026-08-03</b>)", cur ? `${cur[0]} ~ ${cur[1]}` : "", `${esc(t.name)} 기간 수정`);
+          if (v === null) return;
+          const mm2 = String(v).match(/(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})/);
+          if (!mm2) { toast("형식: 2026-08-01 ~ 2026-08-03"); return; }
+          t.start = mm2[1]; t.end = mm2[2]; save(); renderTravel(); toast("기간을 수정했어요");
+        } },
+        { label: `🗑 삭제 · ${t.name}`, danger: true, onClick: async () => {
+          if (!await uiConfirm(`<b>${esc(t.name)}</b> 여행과 내역 전체를 삭제할까요?`, { title: "여행 삭제", ok: "삭제" })) return;
+          travelTrips = travelTrips.filter(x => x.id !== t.id);
+          travelItems = travelItems.filter(i => i.trip !== t.id);
+          if (tvSelected === t.id) tvSelected = null;
+          save(); renderTravel(); toast("삭제했어요");
+        } }
+      ]);
     });
   });
 }
@@ -4385,18 +4599,7 @@ function renderTvRangePanel() {
   d.classList.remove("hidden");
   bindTvRangeRows();
   $("tvRangeCloseBtn").addEventListener("click", () => { tvCalRange = null; renderTvCalDetail(); });
-  $("tvMakeTripBtn").addEventListener("click", async () => {
-    const v = await uiPrompt(`기간: <b>${s} ~ ${e}</b><br>여행 이름을 입력하세요`, "", "새 여행 만들기");
-    if (v === null) return;
-    const name = String(v).trim();
-    if (!name) return;
-    const nt = { id: uid(), name, start: s, end: e };
-    travelTrips.push(nt);
-    tvSelected = nt.id;
-    save();
-    renderTravelCal();
-    toast(`${name} (${fmtRange([s, e])}) 여행을 만들었어요`);
-  });
+  $("tvMakeTripBtn").addEventListener("click", () => tvAddTripForRange(s, e));
 }
 function tvRangeRow(it) {
   return `<tr data-rid="${it.id}" title="더블클릭으로 수정">
@@ -4619,24 +4822,43 @@ function bindTvCalDrag() {
       ev.preventDefault();
     });
     c.addEventListener("mouseenter", () => { if (tvDragStart) mark(tvDragStart, c.dataset.day); });
+    // 여행 띠를 이 날짜로 드롭 = 여행 날짜 이동 (기간 유지)
+    c.addEventListener("dragover", (ev) => { if (tvBandDrag) { ev.preventDefault(); c.classList.add("drop-target"); } });
+    c.addEventListener("dragleave", () => c.classList.remove("drop-target"));
+    c.addEventListener("drop", (ev) => {
+      c.classList.remove("drop-target");
+      if (!tvBandDrag) return;
+      ev.preventDefault();
+      const t = tripById(tvBandDrag.id);
+      const drop = c.dataset.day, grab = tvBandDrag.grabDay || (tripRange(t) || [drop])[0];
+      tvBandDrag = null;
+      if (!t || !drop) return;
+      const shift = Math.round((new Date(drop) - new Date(grab)) / 86400000); // 잡은 날 대비 이동 일수
+      if (!shift) return;
+      const mv = (d) => { const x = new Date(d); x.setDate(x.getDate() + shift); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
+      if (t.start) t.start = mv(t.start);
+      if (t.end) t.end = mv(t.end);
+      save();
+      renderTravelCal();
+      toast(`${t.name} 날짜를 옮겼어요`);
+    });
     c.addEventListener("mouseup", async () => {
       if (!tvDragStart) return;
       const a = tvDragStart, b = c.dataset.day;
       tvDragStart = null;
       clear();
       const [s, e] = a <= b ? [a, b] : [b, a];
+      const hadBand = tvSelBand; tvSelBand = null; // 날짜를 누르면 띠 선택은 해제
       if (s === e) { // 한 칸 클릭 = 그날 내역 보기
         tvCalDay = s;
         tvCalTrip = null;
         tvCalRange = null;
-        renderTvCalDetail();
-        return;
+      } else { // 여러 날 드래그 = 그 기간의 모든 내역 + 합계 패널
+        tvCalRange = [s, e];
+        tvCalDay = null;
+        tvCalTrip = null;
       }
-      // 여러 날 드래그 = 그 기간의 모든 내역 + 합계 패널
-      tvCalRange = [s, e];
-      tvCalDay = null;
-      tvCalTrip = null;
-      renderTvCalDetail();
+      if (hadBand) renderTravelCal(); else renderTvCalDetail(); // 띠 선택 해제됐으면 띠도 다시 그림
     });
   });
 }
@@ -4929,6 +5151,12 @@ document.addEventListener("keydown", (e) => {
   if (!document.getElementById("dlgOverlay").classList.contains("hidden")) return;
   if ([...document.querySelectorAll(".edit-row")].some(el => el.offsetParent !== null)) return; // 보이는 편집줄이 있을 때만 무시 (숨은 화면 잔재는 무시 안 함)
   if (typeof IS_MOBILE !== "undefined" && IS_MOBILE) { e.preventDefault(); mOpenSheet(null); return; }
+  if (mainMenu === "travel" && travelView === "calendar") { // 선택영역으로 여행 추가 (없으면 오늘)
+    e.preventDefault();
+    const sel = tvCalRange ? tvCalRange : (tvCalDay ? [tvCalDay, tvCalDay] : null);
+    tvAddTripForRange(sel ? sel[0] : null, sel ? sel[1] : null);
+    return;
+  }
   if (mainMenu === "savings" && savingsView === "stock") { e.preventDefault(); $("stkAddBtn").click(); return; }
   if (mainMenu === "savings" && savingsView === "deposit") { e.preventDefault(); $("savAddBtn").click(); return; }
   if (mainMenu === "savings" && savingsView === "pension") { e.preventDefault(); $("penAddBtn").click(); return; }
@@ -4944,9 +5172,10 @@ document.addEventListener("keydown", (e) => {
 // 단축키 E = 마우스 올려둔 행 수정 (더블클릭과 동일)
 let hoverRow = null;
 document.addEventListener("mouseover", (e) => {
-  const r = e.target.closest ? e.target.closest("tr[data-id], tr[data-fid], tr[data-sid], tr[data-svid], tr[data-pid], tr[data-eid2], tr[data-lid], tr[data-rid]") : null;
-  if (r) hoverRow = r;
-  else if (hoverRow && !(e.target.closest && e.target.closest("tr") === hoverRow)) hoverRow = null; // 행 밖으로 나가면 해제
+  const tr = e.target.closest ? e.target.closest("tr") : null;
+  // 수정/삭제 버튼이 있는 데이터 행이면 대상 (표 종류 무관 — 여행·재테크·가계부 전부)
+  if (tr && !tr.classList.contains("edit-row") && (tr.querySelector(".del") || tr.querySelector(".edit"))) hoverRow = tr;
+  else if (hoverRow && !(e.target.closest && e.target.closest("tr") === hoverRow)) hoverRow = null;
 });
 document.addEventListener("keydown", (e) => {
   if (e.code !== "KeyE" || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
@@ -4959,6 +5188,91 @@ document.addEventListener("keydown", (e) => {
     hoverRow.querySelector(".edit")?.click();
   }
 });
+// 단축키 Ctrl/Cmd+Z = 되돌리기
+document.addEventListener("keydown", (e) => {
+  if (e.code !== "KeyZ" || !(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+  const t = e.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return; // 입력 중엔 브라우저 기본 되돌리기
+  e.preventDefault();
+  doUndo();
+});
+// 단축키 Backspace/Delete = 마우스 올려둔 행 삭제 (삭제 확인창은 그대로)
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Backspace" && e.key !== "Delete") return;
+  const t = e.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+  if (!document.getElementById("dlgOverlay").classList.contains("hidden")) return;
+  if ([...document.querySelectorAll(".edit-row")].some(el => el.offsetParent !== null)) return;
+  // 여행 달력: 선택된 띠가 있으면 그 여행 삭제, 아니면 선택영역의 여행 삭제
+  if (mainMenu === "travel" && travelView === "calendar" && (tvSelBand || tvCalDay || tvCalRange)) {
+    e.preventDefault();
+    if (tvSelBand) {
+      const t = tripById(tvSelBand);
+      if (t) uiConfirm(`<b>${esc(t.name)}</b> 여행과 전체 내역을 삭제할까요?`, { title: "여행 삭제", ok: "삭제" }).then(ok => {
+        if (!ok) return;
+        travelTrips = travelTrips.filter(x => x.id !== t.id);
+        travelItems = travelItems.filter(i => i.trip !== t.id);
+        tvSelBand = null; if (tvSelected === t.id) tvSelected = null;
+        save(); renderTravel(); toast("삭제했어요");
+      });
+    } else delTripsInSelection();
+    return;
+  }
+  const del = hoverRow && document.contains(hoverRow) && hoverRow.querySelector(".del");
+  if (del) { e.preventDefault(); del.click(); }
+});
+async function tvAddTripForRange(s, e) { // 기간으로 새 여행 만들기 (N·우클릭·버튼 공용)
+  if (!s) s = tvCalDay || todayStr();
+  if (!e) e = s;
+  if (s > e) { const t = s; s = e; e = t; }
+  const v = await uiPrompt(`기간: <b>${fmtRange([s, e])}</b><br>여행 이름을 입력하세요`, "", "새 여행 만들기");
+  if (v === null) return;
+  const name = String(v).trim();
+  if (!name) return;
+  const nt = { id: uid(), name, start: s, end: e };
+  travelTrips.push(nt);
+  tvSelected = nt.id;
+  save();
+  renderTravel();
+  toast(`${esc(name)} (${fmtRange([s, e])}) 여행을 만들었어요`);
+}
+async function tvRenameTrip(t) {
+  if (!t) return;
+  const v = await uiPrompt("여행 이름을 입력하세요", t.name, "이름 변경");
+  if (v === null) return;
+  const name = String(v).trim();
+  if (!name) return;
+  t.name = name;
+  save();
+  renderTravel();
+  toast("이름을 바꿨어요");
+}
+function removeTrips(list) { // 여행+내역 삭제
+  const ids = new Set(list.map(t => t.id));
+  travelTrips = travelTrips.filter(t => !ids.has(t.id));
+  travelItems = travelItems.filter(i => !ids.has(i.trip));
+  if (ids.has(tvSelected)) tvSelected = null;
+  tvCalDay = null; tvCalRange = null; tvCalTrip = null;
+  save();
+  renderTravel();
+  toast(`여행 ${list.length}건 삭제했어요`);
+}
+async function delTripsInSelection() {
+  const [a, b] = tvCalRange ? tvCalRange : [tvCalDay, tvCalDay];
+  const hit = travelTrips.filter(t => { const r = tripRange(t); return r && r[0] <= b && r[1] >= a; }); // 선택 구간과 겹치는 여행
+  if (!hit.length) { toast("선택한 날짜에 여행이 없어요"); return; }
+  const confirmDel = async (list, label) => {
+    if (await uiConfirm(`<b>${list.map(t => esc(t.name)).join(", ")}</b><br>여행의 <b>전체 내역이 삭제</b>됩니다.<br>삭제하시겠습니까?`, { title: label, ok: "삭제" })) removeTrips(list);
+  };
+  if (hit.length === 1) { await confirmDel(hit, "여행 삭제"); return; }
+  // 여러 여행이 걸쳐 있으면: 전체 삭제 / 개별 선택
+  const buttons = [{ label: `전체 삭제 (${hit.length}개)`, value: "all" }]
+    .concat(hit.map((t, i) => ({ label: `${t.name} 만 삭제`, value: "one" + i })))
+    .concat([{ label: "취소", value: null, primary: true }]);
+  const choice = await dialog({ title: "여러 여행이 선택됐어요", msg: `선택한 기간의 여행: <b>${hit.map(t => esc(t.name)).join(", ")}</b><br>어떻게 삭제할까요?`, buttons });
+  if (choice === "all") await confirmDel(hit, "전체 삭제");
+  else if (choice && choice.startsWith("one")) await confirmDel([hit[+choice.slice(3)]], "여행 삭제");
+}
 // 단축키 Esc = 편집 취소 (입력줄·모바일 시트 닫기)
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
@@ -5195,7 +5509,7 @@ async function loadFromHandle() {
   dbLastMod = f.lastModified;
   viewOnly = false;
   if (f.size > 0) {
-    const { all, badSheets, legacy, budgets: b, starts, fixed, tvTrips, tvItems, stocks: stk, savings: sav, pension: pen, estates: est, loans: lo, regionTx: rtx } = await fileToEntries(fileHandle.name, await f.arrayBuffer());
+    const { all, badSheets, legacy, budgets: b, starts, fixed, tvTrips, tvItems, stocks: stk, savings: sav, pension: pen, estates: est, loans: lo, regionTx: rtx, regionCards: rc } = await fileToEntries(fileHandle.name, await f.arrayBuffer());
     entries = all;
     budgets = b || {};
     monthStarts = starts || {};
@@ -5208,6 +5522,8 @@ async function loadFromHandle() {
     estates = est || [];
     loans = lo || [];
     regionTx = rtx || [];
+    if (rc && rc.length) regionCards = rc;
+    initUndoBaseline();
     if (legacy) {
       // "N월" 시트 형식 = 원본에 요약/여행/자산 등 다른 시트가 섞여 있음
       // → 덮어쓰면 그 시트들이 사라지므로 원본 보존을 위해 보기 전용
@@ -5223,7 +5539,7 @@ async function loadFromHandle() {
   const latest = entries.reduce((a, e) => e.date > a ? e.date : a, "");
   if (latest) curMonth = new Date(+latest.slice(0, 4), +latest.slice(5, 7) - 1, 1);
   if (!viewOnly) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx })); } catch (e) {}
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx, rc: regionCards })); } catch (e) {}
   }
   fileState(viewOnly
     ? `👁 ${fileHandle.name} · ${entries.length}건 · 보기 전용`
@@ -5327,7 +5643,7 @@ async function initApp() {
       const c = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
       if (c.entries && c.entries.length) {
         entries = c.entries; budgets = c.budgets || {}; fixedItems = c.fixed || [];
-        monthStarts = c.starts || {}; travelTrips = c.tvT || []; travelItems = c.tvI || []; stocks = c.stk || []; savings = c.sav || []; pension = c.pen || []; estates = c.est || []; loans = c.loan || []; regionTx = c.rtx || [];
+        monthStarts = c.starts || {}; travelTrips = c.tvT || []; travelItems = c.tvI || []; stocks = c.stk || []; savings = c.sav || []; pension = c.pen || []; estates = c.est || []; loans = c.loan || []; regionTx = c.rtx || []; if (c.rc) regionCards = c.rc;
         hasCache = true;
         const latest = entries.reduce((a, e) => e.date > a ? e.date : a, "");
         if (latest) curMonth = new Date(+latest.slice(0, 4), +latest.slice(5, 7) - 1, 1);
@@ -5355,7 +5671,7 @@ async function initApp() {
       try {
         const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
         if (Array.isArray(raw)) { entries = raw; }
-        else { entries = raw.entries || []; budgets = raw.budgets || {}; fixedItems = raw.fixed || []; monthStarts = raw.starts || {}; travelTrips = raw.tvT || []; travelItems = raw.tvI || []; stocks = raw.stk || []; savings = raw.sav || []; pension = raw.pen || []; estates = raw.est || []; loans = raw.loan || []; regionTx = raw.rtx || []; }
+        else { entries = raw.entries || []; budgets = raw.budgets || {}; fixedItems = raw.fixed || []; monthStarts = raw.starts || {}; travelTrips = raw.tvT || []; travelItems = raw.tvI || []; stocks = raw.stk || []; savings = raw.sav || []; pension = raw.pen || []; estates = raw.est || []; loans = raw.loan || []; regionTx = raw.rtx || []; if (raw.rc) regionCards = raw.rc; }
       } catch { entries = []; }
       $("connectOverlay").classList.add("hidden");
       fileState("브라우저 저장 모드");
@@ -5405,7 +5721,7 @@ async function initApp() {
           monthStarts = c.starts || {};
           travelTrips = c.tvT || [];
           travelItems = c.tvI || [];
-          stocks = c.stk || []; savings = c.sav || []; pension = c.pen || []; estates = c.est || []; loans = c.loan || []; regionTx = c.rtx || [];
+          stocks = c.stk || []; savings = c.sav || []; pension = c.pen || []; estates = c.est || []; loans = c.loan || []; regionTx = c.rtx || []; if (c.rc) regionCards = c.rc;
         } catch (e2) { entries = []; budgets = {}; }
         const latest = entries.reduce((a, e) => e.date > a ? e.date : a, "");
         if (latest) curMonth = new Date(+latest.slice(0, 4), +latest.slice(5, 7) - 1, 1);
