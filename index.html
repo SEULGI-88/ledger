@@ -170,6 +170,12 @@
   .chk-col { width:88px; white-space:nowrap; }
   th.sortable { cursor:pointer; user-select:none; }
   .ledger-table th select.sel { font-weight:700; color:inherit; } /* 헤더 필터 셀렉트도 헤더처럼 굵게 */
+  .filter-hdr { border:1px solid var(--border); background:var(--card); border-radius:7px; padding:3px 8px 3px 9px;
+    font-size:11.5px; font-weight:700; color:inherit; cursor:pointer; max-width:calc(100% - 20px);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:middle; }
+  .filter-hdr:hover { border-color:var(--accent); color:var(--accent); }
+  .filter-hdr.on { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); } /* 필터 적용 중 */
+  #ctxMenu .ctx-item .ck { display:inline-block; width:14px; color:var(--accent); flex:0 0 auto; }
   th.sortable:hover { color:var(--accent); }
   .sort-btn { border:none; background:none; cursor:pointer; font-size:11px; color:var(--muted); padding:2px 4px; vertical-align:middle; }
   .sort-btn:hover, .sort-btn.on { color:var(--accent); }
@@ -177,6 +183,8 @@
   .chk-lb { font-size:11.5px; color:var(--text-2); }
   tr.settled td { opacity:.6; }
   tr.settled td.chk-col { opacity:1; }
+  .ledger-table tr.rowsel td { background:var(--accent-soft); }
+  .ledger-table tr.rowsel td:first-child { box-shadow:inset 3px 0 0 var(--accent); }
   tr.settled .chk-lb { color:var(--inc); font-weight:600; }
   .cal-detail { margin-top:12px; padding:14px 18px; }
   .cal-detail h3 { font-size:13.5px; margin-bottom:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
@@ -243,6 +251,7 @@
   #ctxMenu .ctx-item.danger { color:var(--exp); }
   #ctxMenu .ctx-item.danger:hover { background:var(--exp-soft); }
   #ctxMenu .ctx-sep { height:1px; background:var(--border); margin:4px 6px; }
+  #ctxMenu .ctx-head { padding:5px 12px 3px; font-size:11.5px; font-weight:700; color:var(--muted); }
   .drag-handle { cursor:grab; color:var(--muted); margin-right:6px; user-select:none; }
   .drag-handle:hover { color:var(--accent); }
   .chart-slot.dragging { opacity:.4; }
@@ -260,10 +269,11 @@
   .bar-val { font-size:11.5px; color:var(--text-2); font-variant-numeric:tabular-nums; white-space:nowrap; }
   .legend { display:flex; gap:14px; font-size:11.5px; color:var(--text-2); }
   .legend .sw { display:inline-block; width:9px; height:9px; border-radius:3px; margin-right:4px; }
-  #catBars { min-height:308px; display:flex; flex-direction:column; justify-content:center; }
+  #catBars, #eatChart { min-height:308px; display:flex; flex-direction:column; justify-content:center; }
   .chart-row .chart-card { display:flex; flex-direction:column; }
-  #trendChart { flex:1; display:flex; align-items:center; }
-  #trendChart svg, #trendChart .empty { width:100%; }
+  #trendChart, #fxStatMonthly { flex:1; display:flex; align-items:center; }
+  #trendChart svg, #trendChart .empty,
+  #fxStatMonthly svg, #fxStatMonthly .empty { width:100%; }
   .donut-wrap { display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
   .donut-legend { flex:1; min-width:200px; display:flex; flex-direction:column; gap:4px; }
   .donut-leg { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-2); padding:2px 0; }
@@ -284,6 +294,7 @@
                 display:flex; align-items:center; justify-content:center; padding:20px; }
   .dlg { background:var(--card); border-radius:18px; box-shadow:0 10px 40px rgba(0,0,0,.28);
          padding:24px 26px 20px; max-width:420px; width:100%; animation:dlgIn .16s ease-out; }
+  .dlg.dlg-wide { max-width:660px; } /* 단축키 등 가로로 넓게 — 글자 줄바꿈 방지 */
   @keyframes dlgIn { from { transform:scale(.94); opacity:0; } to { transform:scale(1); opacity:1; } }
   .dlg h3 { font-size:15.5px; margin-bottom:10px; }
   .dlg p { font-size:13px; color:var(--text-2); line-height:1.7; margin-bottom:16px; }
@@ -372,6 +383,7 @@ try {
   <button class="nav-item" data-menu="savings">재테크</button>
   <button class="nav-item" data-menu="ido">이도계좌현황</button>
   <button class="nav-item" data-menu="travel">여행기록</button>
+  <button class="nav-item" id="helpBtn" style="margin-left:auto" title="도움말">도움말 ▾</button>
 </nav>
 <aside id="sideNav">
   <button class="side-item" data-view="list"><span class="si-icon">☰</span><span>생활비</span></button>
@@ -474,12 +486,12 @@ try {
         <colgroup><col style="width:116px"><col style="width:96px"><col style="width:96px"><col style="width:170px"><col style="width:420px"><col style="width:140px"><col style="width:104px"><col style="width:80px"></colgroup>
         <thead><tr>
           <th class="sortable" data-sort="date" data-label="날짜">날짜</th>
-          <th><select id="lsTypeSel" class="sel" style="padding:3px 6px;font-size:11.5px;width:100%"></select> <button class="sort-btn" data-lsk="type" title="구분 정렬">↕</button></th>
-          <th><select id="lsWhoSel" class="sel" style="padding:3px 6px;font-size:11.5px;width:100%"></select> <button class="sort-btn" data-lsk="who" title="멤버 정렬">↕</button></th>
-          <th><select id="lsCatSel" class="sel" style="padding:3px 6px;font-size:11.5px;width:100%"></select> <button class="sort-btn" data-lsk="cat" title="카테고리 정렬">↕</button></th>
+          <th><button id="lsTypeSel" class="filter-hdr" title="클릭: 필터 선택 · 값 (우)클릭으로 토글, 전체로 초기화"></button> <button class="sort-btn" data-lsk="type" title="구분 정렬">↕</button></th>
+          <th><button id="lsWhoSel" class="filter-hdr" title="클릭: 멤버 선택 · 여러 개 토글 가능, 전체로 초기화"></button> <button class="sort-btn" data-lsk="who" title="멤버 정렬">↕</button></th>
+          <th><button id="lsCatSel" class="filter-hdr" title="클릭: 카테고리 선택 · 여러 개 토글 가능, 전체로 초기화"></button> <button class="sort-btn" data-lsk="cat" title="카테고리 정렬">↕</button></th>
           <th class="sortable" data-sort="title" data-label="내용">내용</th>
           <th class="amt-h sortable" data-sort="amount" data-label="금액">금액</th>
-          <th class="chk-col"><input type="checkbox" id="chkAll" title="보이는 지출 전체 정산"> <select id="lsSettleSel" class="sel" style="padding:3px 6px;font-size:11px;width:100%"></select></th>
+          <th class="chk-col"><input type="checkbox" id="chkAll" title="보이는 지출 전체 정산"> <button id="lsSettleSel" class="filter-hdr" title="클릭: 정산 필터 · 전체로 초기화"></button></th>
           <th style="text-align:right"><button class="add-btn" id="listAddBtn" style="padding:5px 14px">＋</button></th></tr></thead>
         <tbody id="listBody"></tbody>
       </table>
@@ -533,14 +545,15 @@ try {
         <div id="whoStatChart"></div>
       </div>
       <div class="card chart-card chart-slot" data-chart="eat">
-        <div class="chart-head"><span class="chart-title"><span class="drag-handle" title="끌어서 위치 이동">⠿</span>외식·배달·카페
+        <div class="chart-head"><span class="chart-title"><span class="drag-handle" title="끌어서 위치 이동">⠿</span>
+          <label style="cursor:pointer"><input type="checkbox" class="eat-chk" value="외식" checked> 외식</label>
+          <label style="cursor:pointer;margin-left:8px"><input type="checkbox" class="eat-chk" value="배달" checked> 배달</label>
+          <label style="cursor:pointer;margin-left:8px"><input type="checkbox" class="eat-chk" value="카페" checked> 카페</label>
           <select id="eatShape" class="sel" style="margin-left:6px">
             <option value="donut">도넛형</option>
             <option value="bar">막대형</option>
           </select></span><span class="chart-sub" id="eatSub"></span></div>
-        <div id="eatBig" style="font-size:26px;font-weight:700;color:var(--exp);margin:2px 0 8px"></div>
-        <div id="eatChart" style="margin-bottom:10px"></div>
-        <div id="eatMonthly"></div>
+        <div id="eatChart"></div>
       </div>
     </div>
   </div>
@@ -554,7 +567,7 @@ try {
     <div class="stats" id="regionCards" style="margin-bottom:12px"></div>
     <div class="card table-scroll">
       <table class="ledger-table">
-        <thead><tr><th>카드</th><th>멤버</th><th>날짜</th><th>구분</th><th>내용</th><th class="amt-h">금액</th>
+        <thead><tr><th>카드</th><th>멤버</th><th>날짜</th><th>구분</th><th>카테고리</th><th>내용</th><th class="amt-h">금액</th>
           <th style="text-align:right"><button class="add-btn" id="regionAddBtn" style="padding:5px 14px">＋ 추가</button></th></tr></thead>
         <tbody id="regionBody"></tbody>
       </table>
@@ -868,8 +881,9 @@ let searchScope = "month"; // 검색 범위: month(이번 달)/range(지정 기�
 let scopeYear = String(new Date().getFullYear()); // 1년 단위 선택 연도
 let rangeFrom = "", rangeTo = ""; // 지정 기간
 let listSort = { key: "date", dir: -1 }; // 목록 정렬 (기본: 날짜 내림차순)
-let whoFilter = ""; // 생활비 누구 헤더 필터 (""=전체)
-let catFilter = ""; // 생활비 카테고리 헤더 필터 (""=전체)
+let whoFilter = new Set(); // 생활비 멤버 헤더 필터 (빈 Set=전체, 우클릭으로 다중 선택)
+let catFilter = new Set(); // 생활비 카테고리 헤더 필터 (빈 Set=전체, 우클릭으로 다중 선택)
+let selRows = new Set(); // 생활비 목록 다중선택 (Ctrl+클릭/드래그) — 항목 id
 
 // GitHub Pages(*.github.io)는 서버(도우미) 모드가 아니라 GitHub 공유 모드로 동작
 const httpMode = (location.protocol === "http:" || location.protocol === "https:") && !location.hostname.endsWith("github.io");
@@ -924,8 +938,9 @@ function fileState(msg) {
 }
 
 /* 예쁜 대화상자 — alert/confirm/prompt 대체 */
-function dialog({ title, msg, buttons, input, value, placeholder }) {
+function dialog({ title, msg, buttons, input, value, placeholder, wide }) {
   return new Promise(res => {
+    document.querySelector("#dlgOverlay .dlg").classList.toggle("dlg-wide", !!wide);
     $("dlgTitle").textContent = title || "";
     $("dlgMsg").innerHTML = msg || "";
     const inp = $("dlgInput");
@@ -951,7 +966,7 @@ function dialog({ title, msg, buttons, input, value, placeholder }) {
     };
   });
 }
-const uiAlert = (msg, title = "알림") => dialog({ title, msg });
+const uiAlert = (msg, title = "알림", wide = false) => dialog({ title, msg, wide });
 const uiConfirm = (msg, opt = {}) => dialog({
   title: opt.title || "확인", msg,
   buttons: [{ label: opt.cancel || "취소", value: false }, { label: opt.ok || "확인", value: true, primary: true }]
@@ -1300,11 +1315,11 @@ function buildXlsx() {
   }
   if (regionTx.length) { // 지역카드 시트: 카드/날짜/구분/내용/금액
     const idx = sheetRefs.length + 1;
-    let tb = `<row r="1">` + ["카드", "멤버", "날짜", "구분", "내용", "금액"].map((h, ci) => S(colLetter(ci) + "1", h, 3)).join("") + `</row>`;
+    let tb = `<row r="1">` + ["카드", "멤버", "날짜", "구분", "카테고리", "내용", "금액"].map((h, ci) => S(colLetter(ci) + "1", h, 3)).join("") + `</row>`;
     regionTx.forEach((t, i) => {
       const r = i + 2;
       tb += `<row r="${r}">` + S("A" + r, t.card || "") + S("B" + r, t.who || "") + (t.date ? N("C" + r, dateToSerial(t.date), 1) : "") + S("D" + r, t.type || "사용") +
-        S("E" + r, t.title || "") + (t.amount ? N("F" + r, t.amount, 2) : "") + `</row>`;
+        S("E" + r, t.cat || "") + S("F" + r, t.title || "") + (t.amount ? N("G" + r, t.amount, 2) : "") + `</row>`;
     });
     fileList.push([`xl/worksheets/sheet${idx}.xml`, enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${tb}</sheetData></worksheet>`)]);
     sheetRefs.push({ mon: "지역카드", idx });
@@ -1422,6 +1437,8 @@ async function initFromTemplate(buf) {
 /* ═══════════ 유틸 ═══════════ */
 const $ = (id) => document.getElementById(id);
 function fmtWon(n) { return n.toLocaleString("ko-KR") + "원"; }
+/* 통계 카드 서브라인의 합계 금액 강조 (색·굵기·크기) */
+function emAmt(s, color = "var(--exp)") { return `<span style="color:${color};font-weight:800;font-size:15px;vertical-align:-1px">${s}</span>`; }
 function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 function ym(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; }
 function todayStr() {
@@ -1585,8 +1602,8 @@ function renderStats() {
     .filter(e => useCal ? e.date.startsWith(key) : (global ? inScopeEntry(e) : fymE(e) === key))
     .filter(e => !q || (e.title + " " + e.cat + " " + (e.who || "") + " " + (e.type === "exp" ? "지출" : "입금")).toLowerCase().includes(q))
     .filter(e => typeFilter === "all" || e.type === typeFilter); // 전체/지출/입금 필터도 카드에 반영
-  if (view === "list" && whoFilter) list = list.filter(e => e.who === whoFilter); // 누구 필터도 카드에 반영
-  if (view === "list" && catFilter) list = list.filter(e => e.cat === catFilter); // 카테고리 필터도 카드에 반영
+  if (view === "list" && whoFilter.size) list = list.filter(e => whoFilter.has(e.who)); // 멤버 필터(다중)도 카드에 반영
+  if (view === "list" && catFilter.size) list = list.filter(e => catFilter.has(e.cat)); // 카테고리 필터(다중)도 카드에 반영
   if (view === "list" && settleFilter !== "all") // 정산 필터도 카드에 반영
     list = list.filter(e => e.type === "exp" && (settleFilter === "done" ? e.settled : !e.settled));
   const incList = list.filter(e => e.type === "inc");
@@ -1767,6 +1784,84 @@ function bindDropTarget(el, onDrop) {
     onDrop(ev.dataTransfer.getData("text/plain"));
   });
 }
+/* 여러 항목을 한 날짜로 이동 (다중선택 드래그) */
+function moveEntriesTo(ids, day) {
+  if (!day) return;
+  if (!httpMode && !ghActive() && fsMode && !fileHandle) { toast("파일 연결 중이에요 — 잠시 후 다시 시도해주세요"); return; }
+  let n = 0;
+  ids.forEach(id => { const e2 = entries.find(x => x.id === id); if (e2 && e2.date !== day) { e2.date = day; delete e2.fm; n++; } });
+  if (!n) return;
+  save(); render(); toast(`${n}건을 ${day}(으)로 옮겼어요`);
+}
+/* ── 생활비 목록 다중선택 (Ctrl+클릭/드래그) ── */
+function selVisibleIds() { // 현재 보이는 행 중 선택된 것만 (필터로 숨은 행은 제외해 안전)
+  return [...document.querySelectorAll("#listBody tr[data-id]")].map(tr => tr.dataset.id).filter(id => selRows.has(id));
+}
+function updateSelUI() {
+  document.querySelectorAll("#listBody tr[data-id]").forEach(tr => tr.classList.toggle("rowsel", selRows.has(tr.dataset.id)));
+}
+function clearSel() { selRows.clear(); updateSelUI(); }
+function selSetSettled(on) {
+  const ids = selVisibleIds();
+  let n = 0;
+  ids.forEach(id => { const e = entries.find(x => x.id === id); if (e && e.type === "exp" && !!e.settled !== on) { e.settled = on; n++; } });
+  if (n) { save(); render(); toast(`${n}건 ${on ? "정산 완료" : "정산 취소"}`); }
+}
+async function selDelete() {
+  const ids = selVisibleIds();
+  if (!ids.length) return;
+  if (!await uiConfirm(`선택한 <b>${ids.length}건</b>을 삭제할까요?`, { title: "일괄 삭제", ok: "삭제" })) return;
+  const set = new Set(ids);
+  entries = entries.filter(e => !set.has(e.id));
+  selRows.clear();
+  save(); render(); toast(`${ids.length}건 삭제했어요`);
+}
+{
+  const body = document.getElementById("listBody");
+  let selDrag = null; // { adding }
+  body.addEventListener("mousedown", (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    if (e.target.closest("input,button,label,.edit-row")) return;
+    const tr = e.target.closest("tr[data-id]");
+    if (!tr) return;
+    e.preventDefault(); // 네이티브 드래그·텍스트선택 방지
+    const id = tr.dataset.id;
+    selDrag = { adding: !selRows.has(id) };
+    selDrag.adding ? selRows.add(id) : selRows.delete(id);
+    updateSelUI();
+  });
+  body.addEventListener("mouseover", (e) => {
+    if (!selDrag) return;
+    const tr = e.target.closest("tr[data-id]");
+    if (!tr) return;
+    selDrag.adding ? selRows.add(tr.dataset.id) : selRows.delete(tr.dataset.id);
+    updateSelUI();
+  });
+  document.addEventListener("mouseup", () => { selDrag = null; });
+  // 선택된 행을 우클릭하면 컨텍스트 메뉴 (하단 액션바 대신)
+  body.addEventListener("contextmenu", (e) => {
+    if (e.target.closest("input,button,label,.edit-row")) return;
+    const tr = e.target.closest("tr[data-id]");
+    if (!tr) return;
+    // 선택이 없거나, 선택에 없는 행을 우클릭하면 그 행만 선택으로 전환
+    if (!selRows.has(tr.dataset.id)) { selRows.clear(); selRows.add(tr.dataset.id); updateSelUI(); }
+    const ids = selVisibleIds();
+    if (!ids.length) return;
+    e.preventDefault();
+    const n = ids.length;
+    const anyExp = ids.some(id => { const x = entries.find(y => y.id === id); return x && x.type === "exp"; });
+    const items = [{ label: `${n}개 선택됨`, disabled: true }, { sep: true }];
+    if (anyExp) {
+      items.push({ label: "✓ 정산 완료", onClick: () => selSetSettled(true) });
+      items.push({ label: "정산 취소", onClick: () => selSetSettled(false) });
+      items.push({ sep: true });
+    }
+    items.push({ label: "🗑 삭제", danger: true, onClick: selDelete });
+    items.push({ sep: true });
+    items.push({ label: "선택 해제", onClick: clearSel });
+    showCtxMenu(e.clientX, e.clientY, items);
+  });
+}
 
 /* 행 내 직접 입력/수정 에디터 */
 function catList(type) { // 카테고리 목록 — 지출에는 지역카드(…) 자동 포함
@@ -1860,8 +1955,7 @@ function bindEditorRow(tr) {
   tr.querySelector(".er-save").addEventListener("click", saveFn);
   tr.querySelector(".er-cancel").addEventListener("click", () => render());
   tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
-  if (tr.dataset.eid) { amtInp.focus(); amtInp.select(); } // 수정(더블클릭)은 금액부터
-  else tr.querySelector(".er-title").focus();
+  amtInp.focus(); amtInp.select(); // 추가·수정 모두 금액부터 커서
 }
 
 function bindRowActions(root) {
@@ -1906,7 +2000,8 @@ function bindRowActions(root) {
       tr.querySelector(".edit")?.click();
     });
     tr.addEventListener("dragstart", (ev) => {
-      ev.dataTransfer.setData("text/plain", id);
+      const multi = selRows.has(id) && selVisibleIds().length > 1; // 선택된 행을 끌면 선택 전체 이동
+      ev.dataTransfer.setData("text/plain", multi ? "__multi__" : id);
       ev.dataTransfer.effectAllowed = "move";
       tr.classList.add("dragging");
     });
@@ -1916,19 +2011,13 @@ function bindRowActions(root) {
 
 function renderList() {
   // 헤더 필터 셀렉트 채우기 (현재 상태 유지)
-  $("lsTypeSel").innerHTML = [["all", "구분"], ["exp", "지출"], ["inc", "입금"]]
-    .map(([v, t]) => `<option value="${v}"${typeFilter === v ? " selected" : ""}>${t}</option>`).join("");
-  const whos = [...new Set(["슬구", "쩡이", "현금"].concat(entries.map(e => e.who).filter(Boolean)))];
-  $("lsWhoSel").innerHTML = `<option value="">멤버</option>` +
-    whos.map(w => `<option value="${esc(w)}"${whoFilter === w ? " selected" : ""}>${esc(w)}</option>`).join("");
-  const lcats = [...new Set(catList("exp").concat(DEFAULT_CATS.inc).concat(entries.map(e => e.cat).filter(Boolean)))];
-  $("lsCatSel").innerHTML = `<option value="">카테고리</option>` +
-    lcats.map(c => `<option value="${esc(c)}"${catFilter === c ? " selected" : ""}>${esc(c)}</option>`).join("");
-  $("lsSettleSel").innerHTML = [["all", "정산"], ["undone", "미정산"], ["done", "정산완료"]]
-    .map(([v, t]) => `<option value="${v}"${settleFilter === v ? " selected" : ""}>${t}</option>`).join("");
+  setHdrSingle($("lsTypeSel"), typeFilter, { all: "구분", exp: "지출", inc: "입금" }, "all");
+  setHdrMulti($("lsWhoSel"), whoFilter, "멤버");
+  setHdrMulti($("lsCatSel"), catFilter, "카테고리");
+  setHdrSingle($("lsSettleSel"), settleFilter, { all: "정산", undone: "미정산", done: "정산완료" }, "all");
   let list = monthEntries();
-  if (whoFilter) list = list.filter(e => e.who === whoFilter);
-  if (catFilter) list = list.filter(e => e.cat === catFilter);
+  if (whoFilter.size) list = list.filter(e => whoFilter.has(e.who));
+  if (catFilter.size) list = list.filter(e => catFilter.has(e.cat));
   if (settleFilter !== "all")
     list = list.filter(e => e.type === "exp" && (settleFilter === "done" ? e.settled : !e.settled));
   // 헤더 정렬
@@ -1973,8 +2062,13 @@ function renderList() {
   bindRowActions($("listBody"));
   // 아무 행/날짜 구분줄에나 떨어뜨리면 그 행의 날짜로 이동 (밑줄로 위치 표시)
   $("listBody").querySelectorAll("tr[data-date], .day-sep[data-day]").forEach(el =>
-    bindDropTarget(el, (id) => moveEntryTo(id, el.dataset.date || el.dataset.day)));
+    bindDropTarget(el, (data) => {
+      const day = el.dataset.date || el.dataset.day;
+      if (data === "__multi__") moveEntriesTo(selVisibleIds(), day); // 선택 전체 이동
+      else moveEntryTo(data, day);
+    }));
   updateChkAll();
+  updateSelUI(); // 재렌더 후 선택 하이라이트·액션바 복원
 }
 
 /* 정산완료 전체 체크박스 상태 갱신 */
@@ -1997,16 +2091,23 @@ function renderDistribution() {
   const expList = list.filter(e => e.type === (isInc ? "inc" : "exp"));
   $("catChartTitle").textContent = `${tName} 분포`;
   const mode = $("catChartMode").value; // who=사람별, cat=카테고리별, title=내용별
+  // 카테고리별 지출 분포: 지역카드 충전 덩어리는 빼고, 지역카드 사용 상세를 카테고리로 합침 (중복 방지)
+  let baseList = expList, regionAdd = [];
+  if (mode === "cat" && !isInc) {
+    baseList = expList.filter(e => !regionCatToCard(e.cat));
+    regionAdd = regionUsageInScope();
+  }
   const byCat = new Map();
-  expList.forEach(e => {
+  baseList.forEach(e => {
     const k = mode === "who" ? (e.who || "(미지정)")
       : mode === "title" ? (e.title || e.cat || "(내용없음)")
       : (e.cat || "기타");
     byCat.set(k, (byCat.get(k) || 0) + e.amount);
   });
+  regionAdd.forEach(e => { const k = e.cat || "기타"; byCat.set(k, (byCat.get(k) || 0) + e.amount); });
   const sorted = [...byCat.entries()].sort((a, b) => b[1] - a[1]);
-  const totalExp = expList.reduce((a, e) => a + e.amount, 0);
-  $("catChartSub").textContent = totalExp ? `총 ${fmtWon(totalExp)}` : "";
+  const totalExp = baseList.reduce((a, e) => a + e.amount, 0) + regionAdd.reduce((a, e) => a + e.amount, 0);
+  $("catChartSub").innerHTML = totalExp ? `총 ${emAmt(fmtWon(totalExp))}` : "";
   if (sorted.length && $("catChartShape").value === "donut") {
     renderDonut(sorted.slice(0, 10));
   } else if (sorted.length) {
@@ -2027,8 +2128,8 @@ function renderDistribution() {
 
 function renderChart() {
   renderDistribution();
-  $("dailyTitle").textContent = typeFilter === "all" ? "일별 입금·지출" : `일별 ${typeFilter === "inc" ? "입금" : "지출"}`;
-  renderDailyChart(monthEntries(true), typeFilter);
+  $("dailyTitle").textContent = "일별 지출"; // 통계에는 필터 버튼이 없으니 항상 지출만
+  renderDailyChart(monthEntries(true), "exp");
   renderTrendChart();
   renderFixedStats();
   renderEatOutStats();
@@ -2050,7 +2151,7 @@ function renderWhoStats() {
   $("whoStatChart").innerHTML = rows.length ? rows.map(([w, v]) => `
     <div class="mbar">
       <div class="bl"><span style="font-weight:700">${esc(w)}</span>
-        <b><span style="color:var(--exp)">-${v.exp.toLocaleString()}</span> · <span style="color:var(--inc)">+${v.inc.toLocaleString()}</span></b></div>
+        <b><span style="color:var(--exp)">${v.exp.toLocaleString()}</span> · <span style="color:var(--inc)">${v.inc.toLocaleString()}</span></b></div>
       <div class="bt" style="margin-bottom:3px"><i style="width:${Math.round(v.exp / mx * 100)}%"></i></div>
       <div class="bt"><i style="width:${Math.round(v.inc / mx * 100)}%;background:var(--chart-inc)"></i></div>
     </div>`).join("") : `<div class="empty">이 기간 기록이 없어요</div>`;
@@ -2058,45 +2159,33 @@ function renderWhoStats() {
 
 /* 통계: 그 달 밖에서 쓴 식비 (외식·배달·카페 계열) 합계 + 월별 추이 */
 let eatShape = "donut"; // 외식 카드 표시 형태 (도넛형/막대형)
-function isEatOutCat(c) { return c === "외식" || c === "배달" || String(c || "").startsWith("카페"); }
+let eatSel = { 외식: true, 배달: true, 카페: true }; // 체크된 종류만 집계
+function eatCatKind(c) { return c === "외식" ? "외식" : c === "배달" ? "배달" : String(c || "").startsWith("카페") ? "카페" : null; }
+function isEatOutCat(c) { const k = eatCatKind(c); return !!k && eatSel[k]; }
+function eatEntries() { // 생활비 지출(지역카드 충전 제외) + 지역카드 사용(카테고리 있는 것)
+  const reg = regionTx.filter(t => t.type === "사용" && t.cat).map(t => ({ cat: t.cat, amount: t.amount, date: t.date || "", who: t.who }));
+  return entries.filter(e => e.type === "exp" && !regionCatToCard(e.cat)).concat(reg);
+}
+function regionUsageInScope() { // 현재 화면 범위(월·검색)의 지역카드 사용 내역 (카테고리별 통계용)
+  const q = $("searchInput").value.trim().toLowerCase();
+  return regionTx.filter(t => t.type === "사용" && t.cat)
+    .map(t => ({ type: "exp", cat: t.cat, amount: t.amount || 0, date: t.date || "", who: t.who, title: t.title }))
+    .filter(e => e.date && (view === "calendar" ? e.date.startsWith(ym(curMonth)) : inScopeEntry(e)))
+    .filter(e => !q || (e.title + " " + e.cat + " " + (e.who || "")).toLowerCase().includes(q));
+}
 function renderEatOutStats() {
   const key = ym(curMonth);
-  const cur = entries.filter(e => e.type === "exp" && isEatOutCat(e.cat) && fymE(e) === key);
+  const cur = eatEntries().filter(e => isEatOutCat(e.cat) && fymE(e) === key);
   const sum = cur.reduce((a, e) => a + e.amount, 0);
-  $("eatSub").textContent = `${+key.slice(5, 7)}월 · ${cur.length}건`;
-  $("eatBig").textContent = sum ? "-" + fmtWon(sum) : "0원";
-  const parts = ["외식", "배달"].map(c => [c, cur.filter(e => e.cat === c).reduce((a, e) => a + e.amount, 0)]);
-  parts.push(["카페", cur.filter(e => String(e.cat).startsWith("카페")).reduce((a, e) => a + e.amount, 0)]);
+  $("eatSub").innerHTML = `${+key.slice(5, 7)}월 · ${cur.length}건 · 총 ${emAmt(sum ? fmtWon(sum) : "0원")}`;
+  const kinds = ["외식", "배달", "카페"].filter(k => eatSel[k]);
+  const parts = kinds.map(c => [c, cur.filter(e => eatCatKind(e.cat) === c).reduce((a, e) => a + e.amount, 0)]);
   const items = parts.filter(([, v]) => v > 0);
   if (!items.length) $("eatChart").innerHTML = `<div class="empty" style="padding:14px">이 달 외식·배달·카페 지출이 없어요</div>`;
-  else if (eatShape === "donut") renderDonut(items, "eatChart");
+  else if (eatShape === "donut") renderDonut(items, "eatChart", 280);
   else $("eatChart").innerHTML = items.map(([c, v]) =>
     `<div class="mbar"><div class="bl"><span>${esc(c)}</span><b>-${v.toLocaleString()}</b></div>
      <div class="bt"><i style="width:${Math.round(v / (items[0][1] || 1) * 100)}%"></i></div></div>`).join("");
-  // 월별 추이 (최근 12개월)
-  const months = [];
-  let m = monthKeyShift(key, -11);
-  for (let i = 0; i < 12; i++) { months.push(m); m = monthKeyShift(m, 1); }
-  const vals = months.map(k => entries.filter(e => e.type === "exp" && isEatOutCat(e.cat) && fymE(e) === k).reduce((a, e) => a + e.amount, 0));
-  const maxV = Math.max(...vals, 0);
-  $("eatMonthly").innerHTML = "";
-  const W = 1500, H = 170, padL = 8, padB = 22, padT = 12, plotH = H - padB - padT;
-  const slot = (W - padL * 2) / 12;
-  const svg = d3.select("#eatMonthly").append("svg").attr("viewBox", `0 0 ${W} ${H}`).style("width", "100%").style("height", "auto").style("display", "block");
-  months.forEach((k, i) => {
-    const cx = padL + i * slot + slot / 2, v = vals[i];
-    if (v > 0 && maxV > 0) {
-      const h = Math.max(plotH * v / maxV, 3);
-      svg.append("rect").attr("x", cx - slot * 0.2).attr("width", slot * 0.4).attr("rx", 3)
-        .attr("y", padT + plotH - h).attr("height", h).attr("fill", "var(--chart-exp)");
-    }
-    svg.append("text").attr("x", cx).attr("y", H - 6).attr("font-size", 10.5)
-      .attr("fill", k === key ? "var(--accent)" : "var(--muted)").attr("font-weight", k === key ? 700 : 400)
-      .attr("text-anchor", "middle").text(`${+k.slice(5)}월`);
-    svg.append("rect").attr("x", padL + i * slot).attr("y", 0).attr("width", slot).attr("height", H).attr("fill", "transparent")
-      .attr("data-tip", `<b>${k.slice(0, 4)}년 ${+k.slice(5)}월</b><br>외식·배달·카페 ${fmtWon(vals[i])}`);
-  });
-  bindHoverTips($("eatMonthly"));
 }
 
 /* 통계 탭의 고정지출 섹션: 이번 달 대분류별 도넛 + 월별 합계 추이 */
@@ -2106,7 +2195,7 @@ function renderFixedStats() {
   const byCat = {};
   monthly.forEach(i => { const v = fxAmt(i, cur); if (v) { const c = i.cat || "기타"; byCat[c] = (byCat[c] || 0) + v; } });
   const items = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 10);
-  $("fxStatSub").textContent = items.length ? `${+cur.slice(5, 7)}월 합계 ${fmtWon(Object.values(byCat).reduce((a, v) => a + v, 0))}` : "";
+  $("fxStatSub").innerHTML = items.length ? `${+cur.slice(5, 7)}월 합계 ${emAmt(fmtWon(Object.values(byCat).reduce((a, v) => a + v, 0)))}` : "";
   if (items.length) renderDonut(items, "fxStatDonut");
   else $("fxStatDonut").innerHTML = `<div class="empty">이번 달 고정지출이 없습니다</div>`;
 
@@ -2118,19 +2207,23 @@ function renderFixedStats() {
   months = months.slice(-12);
   const vals = months.map(k => monthly.reduce((a, i) => a + fxAmt(i, k), 0));
   const maxV = Math.max(...vals, 0);
-  const W = 1500, H = 200, padL = 8, padB = 24, padT = 14, plotH = H - padB - padT;
-  const slot = (W - padL * 2) / Math.max(months.length, 1);
+  const W = 780, H = 220, padL = 8, padB = 24, padT = 18, plotH = H - padB - padT;
+  const availW = W - padL * 2;
+  // 막대 폭·간격 일정하게: 개수 적으면 슬롯 상한(94)으로 넉넉히, 많아지면 균등 축소
+  const slot = Math.min(94, availW / Math.max(months.length, 1));
+  const barW = Math.min(slot * 0.5, 48);
+  const startX = padL + Math.max(0, (availW - slot * months.length) / 2); // 개수 적으면 가운데 정렬
   const svg = d3.select("#fxStatMonthly").append("svg").attr("viewBox", `0 0 ${W} ${H}`).style("width", "100%").style("height", "auto").style("display", "block");
   months.forEach((k, i) => {
-    const cx = padL + i * slot + slot / 2, v = vals[i];
+    const cx = startX + i * slot + slot / 2, v = vals[i];
     if (v > 0 && maxV > 0) {
       const h = Math.max(plotH * v / maxV, 3);
-      svg.append("rect").attr("x", cx - slot * 0.2).attr("width", slot * 0.4).attr("rx", 3)
+      svg.append("rect").attr("x", cx - barW / 2).attr("width", barW).attr("rx", 3)
         .attr("y", padT + plotH - h).attr("height", h).attr("fill", "var(--chart-exp)");
     }
     svg.append("text").attr("x", cx).attr("y", H - 7).attr("font-size", 10.5).attr("fill", "var(--muted)")
       .attr("text-anchor", "middle").text(`${+k.slice(5)}월`);
-    svg.append("rect").attr("x", padL + i * slot).attr("y", 0).attr("width", slot).attr("height", H).attr("fill", "transparent")
+    svg.append("rect").attr("x", startX + i * slot).attr("y", 0).attr("width", slot).attr("height", H).attr("fill", "transparent")
       .attr("data-tip", `<b>${k.slice(0, 4)}년 ${+k.slice(5)}월</b><br>고정지출 ${fmtWon(v)}`);
   });
   bindHoverTips($("fxStatMonthly"));
@@ -2183,7 +2276,7 @@ function bindHoverTips(root) {
 
 /* 분포 도넛 — d3 (top10). 팔레트는 dataviz 검증기 통과본 */
 const DONUT_COLORS = ["#2a78d6","#eb6834","#1baf7a","#eda100","#e87ba4","#008300","#4a3aa7","#e34948","#0aa2c0","#946ee6"];
-function renderDonut(items, targetId = "catBars") {
+function renderDonut(items, targetId = "catBars", size = 280) {
   const total = items.reduce((a, r) => a + r[1], 0);
   const svgId = targetId + "DonutSvg";
   $(targetId).innerHTML = `<div class="donut-wrap"><div id="${svgId}" style="flex-shrink:0"></div><div class="donut-legend">` +
@@ -2192,7 +2285,7 @@ function renderDonut(items, targetId = "catBars") {
         <span class="dl-name" title="${esc(name)}">${esc(name)}</span>
         <span class="dl-val">${amt.toLocaleString()} · ${(amt / total * 100).toFixed(0)}%</span></div>`).join("") +
     `</div></div>`;
-  const size = 300, R = size / 2;
+  const R = size / 2;
   const svg = d3.select("#" + svgId).append("svg").attr("viewBox", `0 0 ${size} ${size}`).attr("width", size).attr("height", size);
   const g = svg.append("g").attr("transform", `translate(${R},${R})`);
   const arc = d3.arc().innerRadius(R - 58).outerRadius(R - 10).cornerRadius(5);
@@ -2253,7 +2346,7 @@ function renderDailyChart(list, dMode) {
   }
   const avgType = types.includes("exp") ? "exp" : "inc";
   const avg = daily[avgType].reduce((a, b) => a + b, 0) / n;
-  $("dailySub").textContent = `일평균 ${avgType === "exp" ? "지출" : "입금"} ${fmtWon(Math.round(avg))}`;
+  $("dailySub").innerHTML = `일평균 ${avgType === "exp" ? "지출" : "입금"} ${emAmt(fmtWon(Math.round(avg)), avgType === "exp" ? "var(--exp)" : "var(--inc)")}`;
 
   const W = 1600, H = 230, padL = 8, padB = 22, padT = 16;
   const plotH = H - padB - padT;
@@ -2760,12 +2853,12 @@ async function fileToEntries(nameOrFile, buf) {
     if (s.name.trim() === "지역카드") {
       const h = (s.rows[0] || []).map(x => String(x));
       const c = (kw) => h.findIndex(x => x.includes(kw));
-      const cC = c("카드"), cW = c("멤버"), cD = c("날짜"), cT = c("구분"), cN = c("내용"), cA = c("금액");
+      const cC = c("카드"), cW = c("멤버"), cD = c("날짜"), cT = c("구분"), cCat = c("카테고리"), cN = c("내용"), cA = c("금액");
       for (const r of s.rows.slice(1)) {
         const card = cC >= 0 ? String(r[cC] ?? "").trim() : "";
         const amt = cA >= 0 ? Number(String(r[cA] ?? "").replace(/[,원\s]/g, "")) || 0 : 0;
         if (!card && !amt) continue;
-        foundRegionTx.push({ id: uid() + foundRegionTx.length, card, who: cW >= 0 ? String(r[cW] ?? "").trim() : "", date: cD >= 0 ? normDate(r[cD]) || "" : "", type: cT >= 0 && /충전/.test(String(r[cT])) ? "충전" : "사용", title: cN >= 0 ? String(r[cN] ?? "").trim() : "", amount: amt });
+        foundRegionTx.push({ id: uid() + foundRegionTx.length, card, who: cW >= 0 ? String(r[cW] ?? "").trim() : "", date: cD >= 0 ? normDate(r[cD]) || "" : "", type: cT >= 0 && /충전/.test(String(r[cT])) ? "충전" : "사용", cat: cCat >= 0 ? String(r[cCat] ?? "").trim() : "", title: cN >= 0 ? String(r[cN] ?? "").trim() : "", amount: amt });
       }
       continue;
     }
@@ -3677,13 +3770,13 @@ function renderRegion() {
   });
   // 카드별 그룹 → 최신순 내역
   const tx = [...all].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-  if (!tx.length) { $("regionBody").innerHTML = `<tr><td colspan="7"><div class="empty">내역이 없습니다 — 생활비에서 여민전·대전사랑카드로 지출하면 자동 충전되고, ＋ 추가로 사용 내역을 기록하세요</div></td></tr>`; return; }
+  if (!tx.length) { $("regionBody").innerHTML = `<tr><td colspan="8"><div class="empty">내역이 없습니다 — 생활비에서 여민전·대전사랑카드로 지출하면 자동 충전되고, ＋ 추가로 사용 내역을 기록하세요</div></td></tr>`; return; }
   let html = "";
   cards.forEach(c => {
     const list = tx.filter(t => t.card === c);
     if (!list.length) return;
     const b = bal[c], remain = b.charge - b.use;
-    html += `<tr class="day-sep"><td colspan="7">${esc(c)} · 남은 <b style="color:${remain >= 0 ? "var(--inc)" : "var(--exp)"}">${fmt(remain)}원</b></td></tr>`;
+    html += `<tr class="day-sep"><td colspan="8">${esc(c)} · 남은 <b style="color:${remain >= 0 ? "var(--inc)" : "var(--exp)"}">${fmt(remain)}원</b></td></tr>`;
     list.forEach(t => { html += regionRowHtml(t); });
   });
   $("regionBody").innerHTML = html;
@@ -3696,9 +3789,10 @@ function regionRowHtml(t) {
     <td class="cat-tag">${esc(t.who || "-")}</td>
     <td>${t.date ? t.date.slice(2) : "-"}</td>
     <td><span class="badge ${isCharge ? "i" : "e"}">${isCharge ? "충전" : "사용"}</span></td>
+    <td class="cat-tag">${esc(t.cat || (isCharge ? "" : "-"))}</td>
     <td>${esc(t.title || "-")}${t.auto ? ` <span style="color:var(--muted);font-size:10.5px">생활비</span>` : ""}</td>
     <td class="amt ${isCharge ? "i" : "e"}">${isCharge ? "+" : "-"}${fmt(t.amount || 0)}</td>
-    <td>${t.auto ? "" : `<div class="row-act"><button class="edit" title="수정">✎</button><button class="del" title="삭제">🗑</button></div>`}</td></tr>`;
+    <td><div class="row-act">${t.auto ? `<button class="del" title="생활비 지출 삭제">🗑</button>` : `<button class="edit" title="수정">✎</button><button class="del" title="삭제">🗑</button>`}</div></td></tr>`;
 }
 function regionEditorHtml(t) {
   const cards = [...new Set(regionCards.concat(regionTx.map(x => x.card).filter(Boolean)))];
@@ -3707,6 +3801,7 @@ function regionEditorHtml(t) {
     <td><select class="rg-who">${["쩡이", "슬구", "현금"].map(w => `<option${(t.who || lastWho()) === w ? " selected" : ""}>${w}</option>`).join("")}</select></td>
     <td><input class="rg-date" inputmode="numeric" value="${t.date || todayStr()}" placeholder="260911" style="width:92px"></td>
     <td><select class="rg-type"><option value="사용"${t.type !== "충전" ? " selected" : ""}>사용</option><option value="충전"${t.type === "충전" ? " selected" : ""}>충전</option></select></td>
+    <td><select class="rg-cat"><option value="">카테고리</option>${catList("exp").filter(c => !c.startsWith("지역카드(")).map(c => `<option${t.cat === c ? " selected" : ""}>${esc(c)}</option>`).join("")}</select></td>
     <td><input class="rg-title" value="${esc(t.title || "")}" placeholder="내용" style="width:100%"></td>
     <td class="amt"><input class="rg-amt" inputmode="numeric" value="${t.amount ? t.amount.toLocaleString() : ""}" placeholder="금액" style="width:110px;text-align:right"></td>
     <td><div class="er-act"><button class="er-save" title="저장">✓</button><button class="er-cancel" title="취소">✕</button></div></td></tr>`;
@@ -3716,7 +3811,7 @@ function bindRegionEditor(tr) {
   const saveFn = () => {
     const date = smartDate(tr.querySelector(".rg-date").value, new Date().getFullYear());
     if (date === null) { toast("날짜 형식을 확인하세요 (예: 260911)"); return; }
-    const data = { card: tr.querySelector(".rg-card").value, who: tr.querySelector(".rg-who").value, date, type: tr.querySelector(".rg-type").value, title: tr.querySelector(".rg-title").value.trim(), amount: parseAmount(tr.querySelector(".rg-amt").value) || 0 };
+    const data = { card: tr.querySelector(".rg-card").value, who: tr.querySelector(".rg-who").value, date, type: tr.querySelector(".rg-type").value, cat: tr.querySelector(".rg-cat").value, title: tr.querySelector(".rg-title").value.trim(), amount: parseAmount(tr.querySelector(".rg-amt").value) || 0 };
     if (!data.amount) { toast("금액을 입력하세요"); return; }
     const id = tr.dataset.rid;
     if (id) { const it = regionTx.find(x => x.id === id); if (it) Object.assign(it, data); toast("수정했어요"); }
@@ -3731,7 +3826,17 @@ function bindRegionEditor(tr) {
 function bindRegionRows() {
   $("regionBody").querySelectorAll("tr[data-rid]").forEach(tr => {
     const id = tr.dataset.rid;
-    if (id.startsWith("auto-")) return; // 생활비 연동 충전 행 — 여기선 수정 불가 (생활비에서 관리)
+    if (id.startsWith("auto-")) { // 생활비 연동 충전 행 — 삭제 시 생활비 원본 지출도 삭제
+      tr.querySelector(".del")?.addEventListener("click", async () => {
+        const srcId = id.slice(5);
+        const e = entries.find(x => x.id === srcId);
+        if (!e) return;
+        if (!await uiConfirm(`이 충전은 <b>생활비</b>의 지출(${esc(e.title || "")} ${fmtWon(e.amount)})에서 왔어요.<br>생활비 지출까지 <b>함께 삭제</b>할까요?`, { title: "충전 삭제", ok: "삭제" })) return;
+        entries = entries.filter(x => x.id !== srcId);
+        save(); renderRegion(); toast("생활비 지출과 충전을 삭제했어요");
+      });
+      return;
+    }
     tr.querySelector(".del")?.addEventListener("click", async () => {
       if (!await uiConfirm("이 내역을 삭제할까요?", { ok: "삭제" })) return;
       regionTx = regionTx.filter(x => x.id !== id); save(); renderRegion(); toast("삭제했어요");
@@ -4454,13 +4559,83 @@ function showCtxMenu(x, y, items) { // 마우스 옆에 뜨는 작은 컨텍스�
   closeCtxMenu();
   const m = document.createElement("div");
   m.id = "ctxMenu";
-  m.innerHTML = items.map((it, i) => it.sep ? `<div class="ctx-sep"></div>` : `<button class="ctx-item${it.danger ? " danger" : ""}" data-i="${i}">${esc(it.label)}</button>`).join("");
+  m.innerHTML = items.map((it, i) => it.sep ? `<div class="ctx-sep"></div>`
+    : it.disabled ? `<div class="ctx-head">${esc(it.label)}</div>`
+    : `<button class="ctx-item${it.danger ? " danger" : ""}" data-i="${i}">${esc(it.label)}</button>`).join("");
   document.body.appendChild(m);
   const w = m.offsetWidth, h = m.offsetHeight;
   m.style.left = Math.min(x, innerWidth - w - 8) + "px";
   m.style.top = Math.min(y, innerHeight - h - 8) + "px";
   m.querySelectorAll(".ctx-item").forEach(b => b.addEventListener("click", () => { const it = items[+b.dataset.i]; closeCtxMenu(); it.onClick && it.onClick(); }));
   // 메뉴 바깥을 눌렀을 때만 닫기 (메뉴 안 클릭은 유지 — 항목 클릭이 먹히도록)
+  ctxOutside = (ev) => { if (!m.contains(ev.target)) closeCtxMenu(); };
+  setTimeout(() => document.addEventListener("mousedown", ctxOutside, true), 0);
+}
+/* 도움말 — 현재 적용된 단축키 목록을 알림창으로 */
+function shortcutRow(keys, desc) {
+  const kb = keys.map(k => `<kbd style="display:inline-block;min-width:16px;padding:2px 7px;margin:1px;border:1px solid var(--border-2);border-bottom-width:2px;border-radius:5px;background:var(--card-2);font:600 12px/1.4 inherit;color:var(--text);text-align:center">${k}</kbd>`).join(' <span style="color:var(--muted)">+</span> ');
+  return `<div style="display:flex;align-items:flex-start;gap:14px;padding:8px 0;border-top:1px solid var(--border)">
+    <div style="flex:0 0 auto;min-width:150px;white-space:nowrap">${kb}</div>
+    <div style="flex:1;min-width:0;color:var(--text-2);font-size:13px;line-height:1.5">${desc}</div></div>`;
+}
+function showShortcutsHelp() {
+  const rows = [
+    [["N"], "추가 — 지금 보고 있는 화면에 맞춰 새 항목 추가<br><span style='color:var(--muted);font-size:12px'>생활비·지역카드·고정지출·달력·재테크 / 여행 달력은 선택영역으로 여행 추가</span>"],
+    [["E"], "수정 — 마우스를 올려둔 행 편집 (더블클릭과 동일)"],
+    [["Enter"], "등록·저장 — 입력줄·편집줄에서 확정"],
+    [["Backspace"], "삭제 — 마우스를 올려둔 행 삭제 (확인창 표시)<br><span style='color:var(--muted);font-size:12px'>여행 달력은 선택한 띠·기간의 여행 삭제 · Delete 도 동일</span>"],
+    [["Esc"], "취소 — 열린 편집줄 닫기"],
+    [["Ctrl / Cmd", "Z"], "되돌리기 — 최근 변경 취소 (최대 30단계)"],
+  ];
+  const html = `<div style="text-align:left;margin-top:2px">${rows.map(r => shortcutRow(r[0], r[1])).join("")}
+    <div style="border-top:1px solid var(--border);margin-top:2px;padding-top:10px;color:var(--muted);font-size:12px">입력칸에 커서가 있을 때는 단축키가 동작하지 않아요.</div></div>`;
+  uiAlert(html, "⌨ 단축키", true);
+}
+{
+  const hb = $("helpBtn");
+  if (hb) {
+    const openMenu = (x, y) => showCtxMenu(x, y, [{ label: "⌨ 단축키 보기", onClick: showShortcutsHelp }]);
+    hb.addEventListener("click", (e) => { const r = hb.getBoundingClientRect(); openMenu(r.left, r.bottom + 4); });
+    hb.addEventListener("contextmenu", (e) => { e.preventDefault(); openMenu(e.clientX, e.clientY); });
+  }
+}
+/* 헤더 필터 버튼 라벨 (다중=Set, 단일=값) */
+function setHdrMulti(btn, set, label) {
+  btn.textContent = (set.size === 0 ? label : set.size === 1 ? [...set][0] : `${label} (${set.size})`) + " ▾";
+  btn.classList.toggle("on", set.size > 0);
+}
+function setHdrSingle(btn, val, map, allKey) {
+  btn.textContent = (map[val] || map[allKey]) + " ▾";
+  btn.classList.toggle("on", val !== allKey);
+}
+/* 헤더 필터 드롭다운 — 좌클릭=그 값만 필터(단일), 우클릭=여러 개 토글(다중), 맨 위 "전체"로 초기화.
+   빈 선택 = 전체와 동일. opts: { multi, isSel(v), onPick(v), onToggle(v), onReset() } */
+function openFilterDropdown(anchor, items, opts) {
+  closeCtxMenu();
+  const m = document.createElement("div");
+  m.id = "ctxMenu";
+  m.style.maxHeight = "62vh"; m.style.overflowY = "auto";
+  const r = anchor.getBoundingClientRect();
+  m.style.minWidth = Math.max(150, r.width) + "px";
+  function paint() {
+    m.innerHTML = `<button class="ctx-item" data-reset="1"><b>전체</b></button><div class="ctx-sep"></div>` +
+      items.map((it, i) => `<button class="ctx-item" data-i="${i}" style="display:flex;align-items:center;gap:6px">
+        <span class="ck">${opts.isSel(it.v) ? "✓" : ""}</span>${esc(it.label)}</button>`).join("");
+    m.querySelector('[data-reset]').addEventListener("click", () => { opts.onReset(); closeCtxMenu(); });
+    m.querySelectorAll('[data-i]').forEach(btn => {
+      const v = items[+btn.dataset.i].v;
+      btn.addEventListener("click", () => { opts.onPick(v); closeCtxMenu(); }); // 좌클릭 = 그 값만
+      btn.addEventListener("contextmenu", (e) => { // 우클릭 = 다중 토글 (단일 헤더는 그 값만)
+        e.preventDefault();
+        if (opts.multi) { opts.onToggle(v); paint(); } else { opts.onPick(v); closeCtxMenu(); }
+      });
+    });
+  }
+  paint();
+  document.body.appendChild(m);
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.min(r.left, innerWidth - w - 8) + "px";
+  m.style.top = Math.min(r.bottom + 4, innerHeight - h - 8) + "px";
   ctxOutside = (ev) => { if (!m.contains(ev.target)) closeCtxMenu(); };
   setTimeout(() => document.addEventListener("mousedown", ctxOutside, true), 0);
 }
@@ -5051,7 +5226,7 @@ function renderTravelStats() {
   const vIds = new Set(vTrips.map(t => t.id));
   const sums = vTrips.map(t => [tripLabel(t), tripSum(t.id)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]);
   const total = sums.reduce((a, x) => a + x[1], 0);
-  $("tvDonutSub").textContent = total ? `총 ${fmtWon(total)}` : "";
+  $("tvDonutSub").innerHTML = total ? `총 ${emAmt(fmtWon(total))}` : "";
   if (!sums.length) {
     $("tvDonut").innerHTML = `<div class="empty">여행 지출 기록이 없습니다</div>`;
     $("tvBars").innerHTML = `<div class="empty">여행 지출 기록이 없습니다</div>`;
@@ -5118,8 +5293,9 @@ function resetSearchFilters() {
   searchScope = "month";
   settleFilter = "all";
   typeFilter = "all";
-  whoFilter = "";
-  catFilter = "";
+  whoFilter = new Set();
+  catFilter = new Set();
+  selRows.clear();
   rangeFrom = ""; rangeTo = "";
   scopeYear = String(new Date().getFullYear());
   $("searchInput").value = "";
@@ -5139,10 +5315,36 @@ document.querySelectorAll("#sideNav .side-item").forEach(b =>
     saveUiState();
     render();
   }));
-$("lsTypeSel").addEventListener("change", () => { typeFilter = $("lsTypeSel").value; render(); });
-$("lsWhoSel").addEventListener("change", () => { whoFilter = $("lsWhoSel").value; render(); });
-$("lsCatSel").addEventListener("change", () => { catFilter = $("lsCatSel").value; render(); });
+// 헤더 필터: 클릭하면 드롭다운. 값 (우)클릭으로 토글, 맨 위 "전체"로 초기화
+$("lsTypeSel").addEventListener("click", (e) => {
+  openFilterDropdown(e.currentTarget, [{ v: "exp", label: "지출" }, { v: "inc", label: "입금" }], {
+    multi: false, isSel: (v) => typeFilter === v,
+    onPick: (v) => { typeFilter = v; render(); }, onReset: () => { typeFilter = "all"; render(); }
+  });
+});
+$("lsWhoSel").addEventListener("click", (e) => {
+  const whos = [...new Set(["슬구", "쩡이", "현금"].concat(entries.map(x => x.who).filter(Boolean)))];
+  openFilterDropdown(e.currentTarget, whos.map(w => ({ v: w, label: w })), {
+    multi: true, isSel: (v) => whoFilter.has(v),
+    onPick: (v) => { whoFilter = new Set([v]); render(); }, // 좌클릭: 그 값만
+    onToggle: (v) => { whoFilter.has(v) ? whoFilter.delete(v) : whoFilter.add(v); render(); }, // 우클릭: 토글
+    onReset: () => { whoFilter = new Set(); render(); }
+  });
+});
+$("lsCatSel").addEventListener("click", (e) => {
+  const lcats = [...new Set(catList("exp").concat(DEFAULT_CATS.inc).concat(entries.map(x => x.cat).filter(Boolean)))];
+  openFilterDropdown(e.currentTarget, lcats.map(c => ({ v: c, label: c })), {
+    multi: true, isSel: (v) => catFilter.has(v),
+    onPick: (v) => { catFilter = new Set([v]); render(); }, // 좌클릭: 그 값만
+    onToggle: (v) => { catFilter.has(v) ? catFilter.delete(v) : catFilter.add(v); render(); }, // 우클릭: 토글
+    onReset: () => { catFilter = new Set(); render(); }
+  });
+});
 $("eatShape").addEventListener("change", () => { eatShape = $("eatShape").value; renderEatOutStats(); });
+document.querySelectorAll(".eat-chk").forEach(c => c.addEventListener("change", () => {
+  eatSel[c.value] = c.checked;
+  renderEatOutStats();
+}));
 // 단축키 N = 추가 (입력 중·팝업 열림 상태 제외, 한/영 무관 — 윈도우·맥 공통)
 document.addEventListener("keydown", (e) => {
   if (e.code !== "KeyN" || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
@@ -5203,6 +5405,10 @@ document.addEventListener("keydown", (e) => {
   if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
   if (!document.getElementById("dlgOverlay").classList.contains("hidden")) return;
   if ([...document.querySelectorAll(".edit-row")].some(el => el.offsetParent !== null)) return;
+  // 생활비 목록에서 Ctrl+선택한 행들이 있으면 일괄 삭제 (확인창)
+  if (mainMenu === "ledger" && view === "list" && selVisibleIds().length) {
+    e.preventDefault(); selDelete(); return;
+  }
   // 여행 달력: 선택된 띠가 있으면 그 여행 삭제, 아니면 선택영역의 여행 삭제
   if (mainMenu === "travel" && travelView === "calendar" && (tvSelBand || tvCalDay || tvCalRange)) {
     e.preventDefault();
@@ -5276,11 +5482,22 @@ async function delTripsInSelection() {
 // 단축키 Esc = 편집 취소 (입력줄·모바일 시트 닫기)
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
-  if (!document.getElementById("dlgOverlay").classList.contains("hidden")) return; // 팝업은 자체 버튼으로
+  if (document.getElementById("ctxMenu")) { closeCtxMenu(); return; } // 열린 컨텍스트 메뉴 먼저 닫기
+  if (!document.getElementById("dlgOverlay").classList.contains("hidden")) { // 알림/확인창 Esc로 닫기 (취소 우선)
+    const btns = [...document.getElementById("dlgBtns").children];
+    (btns.find(b => !b.classList.contains("add-btn")) || btns[btns.length - 1])?.click();
+    return;
+  }
   if (typeof IS_MOBILE !== "undefined" && IS_MOBILE && !$("mSheetWrap").classList.contains("hidden")) { mCloseSheet(); return; }
-  document.querySelector(".edit-row .er-cancel")?.click();
+  if (document.querySelector(".edit-row")) { document.querySelector(".edit-row .er-cancel")?.click(); return; }
+  if (selRows.size) { clearSel(); } // 선택 해제
 });
-$("lsSettleSel").addEventListener("change", () => { settleFilter = $("lsSettleSel").value; render(); });
+$("lsSettleSel").addEventListener("click", (e) => {
+  openFilterDropdown(e.currentTarget, [{ v: "undone", label: "미정산" }, { v: "done", label: "정산완료" }], {
+    multi: false, isSel: (v) => settleFilter === v,
+    onPick: (v) => { settleFilter = v; render(); }, onReset: () => { settleFilter = "all"; render(); }
+  });
+});
 document.querySelectorAll("#listView .sort-btn[data-lsk]").forEach(b =>
   b.addEventListener("click", () => { // 헤더 ↕ 정렬: 1클릭 → 반대 → 기본 복귀
     const k = b.dataset.lsk;
@@ -5355,6 +5572,7 @@ const MENU_NAMES = { ledger: "가계부", savings: "재테크", ido: "이도계�
 let mainMenu = "ledger";
 document.querySelectorAll("#mainMenu .nav-item").forEach(b =>
   b.addEventListener("click", () => {
+    if (!b.dataset.menu) return; // 도움말 등 data-menu 없는 버튼은 뷰 전환 안 함
     mainMenu = b.dataset.menu;
     document.querySelectorAll("#mainMenu .nav-item").forEach(x => x.classList.toggle("active", x.dataset.menu === mainMenu));
     const ledger = mainMenu === "ledger";
