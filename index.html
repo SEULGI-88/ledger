@@ -147,11 +147,11 @@
              border-radius:5px; padding:1px 7px; margin-left:6px; font-weight:600; }
   .day-tag.hol { background:var(--exp-soft); color:var(--exp); }
   /* 여행 띠 — 셀 경계를 넘어 이음새 없이 연속으로 (구글 캘린더식) */
-  .tv-band { font-size:10px; line-height:15px; color:#fff; border-radius:0; padding:0 5px; margin:0 -15px 2px -15px;
-             overflow:hidden; white-space:nowrap; text-overflow:ellipsis; opacity:.94; position:relative; z-index:1; cursor:pointer; }
+  .tv-band { font-size:10px; line-height:15px; color:#fff; border-radius:0; padding:0 5px; margin:0 -22px 2px -22px;
+             overflow:hidden; white-space:nowrap; text-overflow:ellipsis; position:relative; z-index:1; cursor:pointer; }
   .tv-band.bl { margin-left:0; border-top-left-radius:8px; border-bottom-left-radius:8px; }
   .tv-band.br { margin-right:0; border-top-right-radius:8px; border-bottom-right-radius:8px; }
-  .tv-band.sel { filter:brightness(.72); font-weight:700; z-index:3; } /* 선택된 띠 = 전체 어둡게 (칸 경계선 안 생기게) */
+  .tv-band.tvsel { } /* 선택 표시는 배경색만 어둡게(JS) · 범용 .sel(테두리 1px)과 충돌 안 나게 별도 클래스 — 높이 변화로 옆 띠가 끊기지 않게 */
   .tv-band-empty { height:15px; margin-bottom:2px; } /* 레인 자리맞춤 (빈 줄) */
   #tvCalGrid .cal-day { overflow:visible; height:auto; min-height:74px; } /* 여행 많으면 그 줄이 늘어나고 페이지가 스크롤 */
   #tvMap { height:660px; }
@@ -224,6 +224,9 @@
   .badge.e { background:var(--exp-soft); color:var(--exp); }
   .badge.i { background:var(--inc-soft); color:var(--inc); }
   .cat-tag { font-size:11.5px; color:var(--text-2); }
+  /* 생활비 목록: 내용 본문만 왼쪽, 나머지(헤더 포함)와 내용 헤더는 가운데 정렬 */
+  #listView th, #listView td { text-align:center; }
+  #listView td.title-cell, #listView tr.day-sep td { text-align:left; }
   .row-act { visibility:hidden; display:flex; gap:6px; }
   tr:hover .row-act { visibility:visible; }
   .row-act button { border:none; background:none; cursor:pointer; font-size:12px; color:var(--muted); padding:1px 4px; border-radius:4px; }
@@ -252,6 +255,11 @@
   #ctxMenu .ctx-item.danger:hover { background:var(--exp-soft); }
   #ctxMenu .ctx-sep { height:1px; background:var(--border); margin:4px 6px; }
   #ctxMenu .ctx-head { padding:5px 12px 3px; font-size:11.5px; font-weight:700; color:var(--muted); }
+  .ac-dropdown { position:fixed; z-index:1000; background:var(--card); border:1px solid var(--border);
+    border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.16); padding:4px; max-height:240px; overflow-y:auto; max-width:360px; }
+  .ac-dropdown .ac-item { padding:7px 10px; border-radius:7px; cursor:pointer; font-size:13px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ac-dropdown .ac-item:hover, .ac-dropdown .ac-item.on { background:var(--accent-soft); }
   .drag-handle { cursor:grab; color:var(--muted); margin-right:6px; user-select:none; }
   .drag-handle:hover { color:var(--accent); }
   .chart-slot.dragging { opacity:.4; }
@@ -295,6 +303,11 @@
   .dlg { background:var(--card); border-radius:18px; box-shadow:0 10px 40px rgba(0,0,0,.28);
          padding:24px 26px 20px; max-width:420px; width:100%; animation:dlgIn .16s ease-out; }
   .dlg.dlg-wide { max-width:660px; } /* 단축키 등 가로로 넓게 — 글자 줄바꿈 방지 */
+  /* 카드내역 모달: 전역 .dlg input 스타일이 체크박스·입력칸을 망가뜨리지 않게 리셋 */
+  .dlg .ci-modal input[type="checkbox"] { width:16px; height:16px; padding:0; margin:0; border:0; border-radius:0; accent-color:var(--accent); vertical-align:middle; cursor:pointer; }
+  .dlg .ci-modal input[type="text"] { margin:0; }
+  .dlg .ci-modal select { margin:0; width:auto; }
+  .dlg .ci-modal th { font-weight:600; color:var(--muted); }
   @keyframes dlgIn { from { transform:scale(.94); opacity:0; } to { transform:scale(1); opacity:1; } }
   .dlg h3 { font-size:15.5px; margin-bottom:10px; }
   .dlg p { font-size:13px; color:var(--text-2); line-height:1.7; margin-bottom:16px; }
@@ -409,7 +422,6 @@ try {
   <button class="side-item active" data-tv="calendar"><span class="si-icon">📅</span><span>달력</span></button>
   <button class="side-item" data-tv="list"><span class="si-icon">☰</span><span>목록</span></button>
   <button class="side-item" data-tv="stats"><span class="si-icon">📊</span><span>통계</span></button>
-  <button class="side-item" data-tv="map"><span class="si-icon">🗺️</span><span>지도</span></button>
 </aside>
 <div class="wrap">
   <div id="connectOverlay" class="hidden" style="position:fixed;inset:0;background:var(--bg);z-index:20;display:flex;align-items:center;justify-content:center;padding:20px">
@@ -442,9 +454,11 @@ try {
     <div class="head-actions">
       <button class="btn" id="ghBtn" title="GitHub 저장소로 데이터 공유">☁ GitHub</button>
       <button class="btn" id="ghEditBtn" title="최신 데이터를 엑셀 파일로 내려 수정하면 자동 업로드">📥 엑셀 수정</button>
+      <button class="btn" id="cardImportBtn" title="삼성·현대·여민전·온통대전 내역 엑셀(여러 개 가능)을 올려 자동 등록">💳 카드내역</button>
       <button class="btn" id="changeFileBtn">📂 파일 변경</button>
       <button class="btn" id="exportBtn">⬇ 내보내기</button>
     </div>
+    <input type="file" id="cardImportInput" accept=".xlsx,.xls,.html,.htm" multiple style="display:none">
   </div>
   <div class="toolbar">
     <select id="searchScope" class="sel">
@@ -483,14 +497,14 @@ try {
   <div id="listView" class="hidden">
     <div class="card table-scroll">
       <table class="ledger-table" style="table-layout:fixed">
-        <colgroup><col style="width:116px"><col style="width:96px"><col style="width:96px"><col style="width:170px"><col style="width:420px"><col style="width:140px"><col style="width:104px"><col style="width:80px"></colgroup>
+        <colgroup><col style="width:116px"><col style="width:96px"><col style="width:170px"><col style="width:140px"><col style="width:420px"><col style="width:96px"><col style="width:104px"><col style="width:80px"></colgroup>
         <thead><tr>
           <th class="sortable" data-sort="date" data-label="날짜">날짜</th>
           <th><button id="lsTypeSel" class="filter-hdr" title="클릭: 필터 선택 · 값 (우)클릭으로 토글, 전체로 초기화"></button> <button class="sort-btn" data-lsk="type" title="구분 정렬">↕</button></th>
-          <th><button id="lsWhoSel" class="filter-hdr" title="클릭: 멤버 선택 · 여러 개 토글 가능, 전체로 초기화"></button> <button class="sort-btn" data-lsk="who" title="멤버 정렬">↕</button></th>
           <th><button id="lsCatSel" class="filter-hdr" title="클릭: 카테고리 선택 · 여러 개 토글 가능, 전체로 초기화"></button> <button class="sort-btn" data-lsk="cat" title="카테고리 정렬">↕</button></th>
-          <th class="sortable" data-sort="title" data-label="내용">내용</th>
           <th class="amt-h sortable" data-sort="amount" data-label="금액">금액</th>
+          <th class="sortable" data-sort="title" data-label="내용">내용</th>
+          <th><button id="lsWhoSel" class="filter-hdr" title="클릭: 멤버 선택 · 여러 개 토글 가능, 전체로 초기화"></button> <button class="sort-btn" data-lsk="who" title="멤버 정렬">↕</button></th>
           <th class="chk-col"><input type="checkbox" id="chkAll" title="보이는 지출 전체 정산"> <button id="lsSettleSel" class="filter-hdr" title="클릭: 정산 필터 · 전체로 초기화"></button></th>
           <th style="text-align:right"><button class="add-btn" id="listAddBtn" style="padding:5px 14px">＋</button></th></tr></thead>
         <tbody id="listBody"></tbody>
@@ -562,8 +576,10 @@ try {
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
       <span style="font-weight:700;font-size:13px">지역카드</span>
       <button class="btn" id="regionCardAddBtn" style="padding:4px 12px">＋ 카드 추가</button>
+      <button class="btn" id="yeomImportBtn" style="padding:4px 12px" title="여민전·온통대전·삼성·현대 내역 엑셀(여러 개 가능)을 올려 자동 등록">💳 카드내역</button>
       <span style="font-size:11.5px;color:var(--muted)">카드 우클릭 = 이름 변경·삭제</span>
     </div>
+    <input type="file" id="yeomImportInput" accept=".xlsx,.xls,.html,.htm" multiple style="display:none">
     <div class="stats" id="regionCards" style="margin-bottom:12px"></div>
     <div class="card table-scroll">
       <table class="ledger-table">
@@ -623,14 +639,6 @@ try {
         </table>
       </div>
       <div class="card cal-detail hidden" id="tvDetail"></div>
-    </div>
-    <div id="tvMapView" class="hidden">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
-        <select id="tvYearSelMap" class="sel"></select>
-        <select id="tvPinTrip" class="sel"></select>
-        <span class="cat-tag" id="tvMapHint">여행을 고른 뒤 지도를 클릭하면 핀이 찍혀요 · 휠로 확대, 드래그로 이동</span>
-      </div>
-      <div class="card" style="overflow:hidden"><div id="tvMap"></div></div>
     </div>
     <div id="tvStatsView" class="hidden">
       <div style="margin-bottom:10px"><select id="tvYearSelStats" class="sel"></select></div>
@@ -756,7 +764,7 @@ try {
 /* ═══════════ 데이터 ═══════════ */
 const STORAGE_KEY = "ledger-v1";
 const DEFAULT_CATS = {
-  exp: ["장보기", "배달", "외식", "카페/간식", "교통", "주거/관리비", "통신", "쇼핑", "의료/건강", "미용", "문화/여가", "구독", "경조사", "기타"],
+  exp: ["장보기", "배달", "외식", "카페/간식", "교통", "주거/관리비", "통신", "쇼핑", "의료/건강", "미용", "문화/여가", "여행", "구독", "경조사", "기타"],
   inc: ["입금", "추가입금", "이자", "급여", "기타"]
 };
 // 매년 반복 기념일 ("MM-DD": 표시명) — 달력에 표시됨
@@ -1568,6 +1576,7 @@ function budgetInfo(targetKey, useCal) { // useCal=true면 1일 기준(달력 �
 
   const sums = {};
   entries.forEach(e => {
+    if (e.type === "exp" && e.who === "현금") return; // 현금 지출은 별도 보유 현금 — 예산·남은금액에서 제외
     const k = keyOf(e);
     if (!sums[k]) sums[k] = { inc: 0, exp: 0 };
     sums[k][e.type] += e.amount;
@@ -1607,15 +1616,22 @@ function renderStats() {
   if (view === "list" && settleFilter !== "all") // 정산 필터도 카드에 반영
     list = list.filter(e => e.type === "exp" && (settleFilter === "done" ? e.settled : !e.settled));
   const incList = list.filter(e => e.type === "inc");
-  const expList = list.filter(e => e.type === "exp");
+  // 현금 지출은 통장에서 안 나간 별도 현금 — 지출 카드에서 제외 (멤버 필터로 현금을 콕 집어 볼 땐 그대로)
+  const expList = list.filter(e => e.type === "exp" && (whoFilter.has("현금") || e.who !== "현금"));
   const inc = incList.reduce((a, e) => a + e.amount, 0);
   const exp = expList.reduce((a, e) => a + e.amount, 0);
+  // 현금 지출은 따로 모아 별도 카드로 (지출 합계엔 제외돼 있음). 현금 필터 중이면 이미 지출 카드에 포함이라 생략
+  const cashList = list.filter(e => e.type === "exp" && e.who === "현금");
+  const cash = cashList.reduce((a, e) => a + e.amount, 0);
+  const cashCard = (!whoFilter.has("현금") && cash > 0)
+    ? `<div class="stat"><div class="label">현금 지출 <span style="color:var(--muted);font-size:11px">· 통장 외</span></div><div class="value" style="color:#a16207">-${fmtWon(cash)}<small style="font-size:11px;color:var(--muted)"> · ${cashList.length}건</small></div></div>`
+    : "";
   if (global) {
     $("stats").innerHTML = `
       <div class="stat"><div class="label">${searchScope === "year" ? scopeYear + "년" : searchScope === "range" ? `${rangeFrom || "…"} ~ ${rangeTo || "…"}` : "전체 기간"}${view === "list" && settleFilter !== "all" ? (settleFilter === "done" ? " · 정산완료" : " · 미정산") : ""}</div><div class="value" style="font-size:16px">${qRaw ? `"${esc(qRaw)}" · ` : ""}${list.length}건</div></div>
       <div class="stat"><div class="label">입금 합계</div><div class="value inc">${inc ? "+" + fmtWon(inc) : "0원"}<small style="font-size:11px;color:var(--muted)"> · ${incList.length}건</small></div></div>
       <div class="stat"><div class="label">지출 합계</div><div class="value exp">${exp ? "-" + fmtWon(exp) : "0원"}<small style="font-size:11px;color:var(--muted)"> · ${expList.length}건</small></div></div>
-      <div class="stat"><div class="label">입금 - 지출</div><div class="value ${inc - exp >= 0 ? "inc" : "exp"}">${fmtWon(inc - exp)}</div></div>`;
+      <div class="stat"><div class="label">입금 - 지출</div><div class="value ${inc - exp >= 0 ? "inc" : "exp"}">${fmtWon(inc - exp)}</div></div>${cashCard}`;
     return;
   }
   const bi = budgetInfo(ym(curMonth), useCal);
@@ -1628,7 +1644,7 @@ function renderStats() {
     </div>
     <div class="stat"><div class="label">입금</div><div class="value inc">${inc ? "+" + fmtWon(inc) : "0원"}<small style="font-size:11px;color:var(--muted)"> · ${incList.length}건</small></div></div>
     <div class="stat"><div class="label">지출</div><div class="value exp">${exp ? "-" + fmtWon(exp) : "0원"}<small style="font-size:11px;color:var(--muted)"> · ${expList.length}건</small></div></div>
-    <div class="stat"><div class="label">남은 금액</div><div class="value ${remain == null ? "" : remain >= 0 ? "inc" : "exp"}">${remain != null ? fmtWon(remain) : "-"}</div></div>`;
+    <div class="stat"><div class="label">남은 금액</div><div class="value ${remain == null ? "" : remain >= 0 ? "inc" : "exp"}">${remain != null ? fmtWon(remain) : "-"}</div></div>${cashCard}`;
   if (useCal) { // 달력 탭: 그 달의 고정지출 합계 (월 고정 + 납부일이 그 달인 년 고정)
     const fxMonSum = fixedItems.filter(i => normFxPeriod(i.period || "월") === "월").reduce((a, i) => a + fxAmt(i, key), 0);
     const fxYrSum = fixedItems.filter(i => normFxPeriod(i.period || "월") === "년" && i.year === +key.slice(0, 4) && (i.date || "").slice(0, 7) === key)
@@ -1745,10 +1761,10 @@ function rowHtml(e, withDate = true, withCheck = false) {
   return `<tr data-id="${e.id}" data-date="${e.date}" draggable="true" class="${e.settled ? "settled" : ""}">
     ${withDate ? `<td>${e.date.slice(5)}</td>` : `<td></td>`}
     <td><span class="badge ${e.type === "exp" ? "e" : "i"}">${e.type === "exp" ? "지출" : "입금"}</span></td>
-    <td class="cat-tag">${esc(e.who || "-")}</td>
     <td class="cat-tag">${esc(e.cat || "-")}</td>
-    <td class="title-cell" title="${esc(e.title || e.cat)}">${esc(e.title || e.cat || "-")}</td>
     <td class="amt ${e.type === "exp" ? "e" : "i"}">${e.type === "exp" ? "-" : "+"}${e.amount.toLocaleString()}</td>
+    <td class="title-cell" title="${esc(e.title || e.cat)}">${esc(e.title || e.cat || "-")}</td>
+    <td class="cat-tag">${esc(e.who || "-")}</td>
     ${withCheck ? (e.type === "exp"
       ? `<td class="chk-col"><input type="checkbox" class="rowchk" ${e.settled ? "checked" : ""} title="정산완료"> <span class="chk-lb">${e.settled ? "완료" : "미완료"}</span></td>`
       : `<td class="chk-col"></td>`) : ""}
@@ -1816,6 +1832,54 @@ async function selDelete() {
   selRows.clear();
   save(); render(); toast(`${ids.length}건 삭제했어요`);
 }
+/* 선택한 생활비 항목을 여행 내역으로 이동 (entries → travelItems) */
+function moveEntriesToTrip(ids, tripId, tripName) {
+  const set = new Set(ids);
+  const moving = entries.filter(e => set.has(e.id));
+  if (!moving.length) return;
+  moving.forEach(e => travelItems.push({
+    id: uid(), trip: tripId, date: e.date,
+    title: e.title || e.cat || "", amount: Math.abs(e.amount) || 0,
+    memo: [e.who, e.cat].filter(Boolean).join(" · ") // 멤버·카테고리는 메모로 보존
+  }));
+  entries = entries.filter(e => !set.has(e.id));
+  selRows.clear();
+  save(); render(); toast(`${tripName ? esc(tripName) + "(으)로 " : "여행으로 "}${moving.length}건 옮겼어요`);
+}
+/* 선택 우클릭 → "여행으로 이동" 서브메뉴 (기존 여행 / 새 여행) */
+function openTripMoveMenu(ids, x, y) {
+  const trips = travelTrips.slice().sort((a, b) => {
+    const ra = tripRange(a), rb = tripRange(b);
+    return (rb ? rb[0] : "").localeCompare(ra ? ra[0] : ""); // 최근 여행 먼저
+  });
+  const items = [{ label: "＋ 새 여행 만들기", onClick: () => newTripFromSelection(ids) }];
+  if (trips.length) {
+    items.push({ sep: true });
+    trips.forEach(t => items.push({ label: `${t.name} · ${fmtRange(tripRange(t))}`, onClick: () => moveEntriesToTrip(ids, t.id, t.name) }));
+  }
+  showCtxMenu(x, y, items);
+}
+/* 새 여행 만들기: 여행명 + 기간 입력(선택 항목 날짜 범위로 기본값) → 여행기록에 추가 후 이동 */
+async function newTripFromSelection(ids) {
+  const ds = entries.filter(e => ids.includes(e.id)).map(e => e.date).filter(Boolean).sort();
+  const s0 = ds[0] || todayStr(), e0 = ds[ds.length - 1] || s0;
+  const inStyle = "width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;text-align:left;box-sizing:border-box;background:var(--card);color:var(--text)";
+  const dStyle = "flex:1;min-width:0;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;text-align:center;box-sizing:border-box;background:var(--card);color:var(--text)";
+  const msg = `<span style="display:block;margin-bottom:12px">여행명<input id="ntName" type="text" placeholder="예: 부산 여행" style="${inStyle}"></span>`
+    + `<span style="display:block">기간<span style="display:flex;gap:8px"><input id="ntStart" value="${s0}" placeholder="시작" style="${dStyle}"><input id="ntEnd" value="${e0}" placeholder="종료" style="${dStyle}"></span></span>`;
+  const ok = await dialog({ title: "새 여행 만들기", msg, buttons: [{ label: "취소", value: false }, { label: "만들기", value: true, primary: true }] });
+  if (!ok) return;
+  const name = (document.getElementById("ntName")?.value || "").trim();
+  if (!name) { toast("여행 이름을 입력하세요"); return; }
+  const yr = new Date().getFullYear();
+  const start = smartDate(document.getElementById("ntStart")?.value, yr);
+  const end = smartDate(document.getElementById("ntEnd")?.value, yr);
+  if (!start || !end) { toast("기간을 확인하세요 (예: 260908, 9/8)"); return; }
+  const [s, e] = start <= end ? [start, end] : [end, start];
+  const nt = { id: uid(), name, start: s, end: e };
+  travelTrips.push(nt);          // 여행기록에 추가
+  moveEntriesToTrip(ids, nt.id, name); // 선택 항목 이동 (save·render·toast 포함)
+}
 {
   const body = document.getElementById("listBody");
   let selDrag = null; // { adding }
@@ -1856,6 +1920,9 @@ async function selDelete() {
       items.push({ label: "정산 취소", onClick: () => selSetSettled(false) });
       items.push({ sep: true });
     }
+    const mx = e.clientX, my = e.clientY;
+    items.push({ label: "🧳 여행으로 이동", onClick: () => openTripMoveMenu(ids, mx, my) });
+    items.push({ sep: true });
     items.push({ label: "🗑 삭제", danger: true, onClick: selDelete });
     items.push({ sep: true });
     items.push({ label: "선택 해제", onClick: clearSel });
@@ -1904,17 +1971,80 @@ function editorRowHtml(e, withDate = true, editableDate = false, withCheck = fal
     <td><select class="er-type">
       <option value="exp"${type === "exp" ? " selected" : ""}>지출</option>
       <option value="inc"${type === "inc" ? " selected" : ""}>입금</option></select></td>
-    <td><select class="er-who">${whos.map(w => `<option${whoSel === w ? " selected" : ""}>${esc(w)}</option>`).join("")}</select></td>
     <td><select class="er-cat">${catOptions(type, e.cat)}</select></td>
-    <td><input class="er-title" type="text" value="${esc(e.title || "")}" placeholder="내용"></td>
     <td class="amt"><input class="er-amt" type="text" inputmode="numeric" value="${e.amount ? e.amount.toLocaleString() : ""}" placeholder="금액"></td>
+    <td><input class="er-title" type="text" value="${esc(e.title || "")}" placeholder="내용" autocomplete="off"></td>
+    <td><select class="er-who">${whos.map(w => `<option${whoSel === w ? " selected" : ""}>${esc(w)}</option>`).join("")}</select></td>
     ${withCheck ? `<td class="chk-col"></td>` : ""}
     <td><div class="er-act">
       <button class="er-save" title="저장">✓</button>
       <button class="er-cancel" title="취소">✕</button>
     </div></td></tr>`;
 }
+let titleSuggestList = []; // 기존 등록된 내용 (빈도순)
+let titleCatMap = {};      // 내용 → 그 내용이 쓰인 카테고리 Set (카테고리 기준 우선 제안용)
+function refreshTitleSuggest() {
+  const cnt = {}; titleCatMap = {};
+  entries.forEach(e => {
+    const t = (e.title || "").trim(); if (!t) return;
+    cnt[t] = (cnt[t] || 0) + 1;
+    (titleCatMap[t] = titleCatMap[t] || new Set()).add(e.cat || "");
+  });
+  titleSuggestList = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]);
+}
+/* 내용 자동완성 — 입력칸 바로 아래 붙는 커스텀 드롭다운 (구글/네이버식). 1자 이상 입력 시에만 */
+let acState = null; // { inp, items }
+function ensureAcDropdown() {
+  let dd = document.getElementById("acDropdown");
+  if (dd) return dd;
+  dd = document.createElement("div");
+  dd.id = "acDropdown"; dd.className = "ac-dropdown hidden";
+  document.body.appendChild(dd);
+  dd.addEventListener("mousedown", (e) => { // mousedown = blur보다 먼저 → 선택 반영
+    const it = e.target.closest(".ac-item");
+    if (!it || !acState) return;
+    e.preventDefault();
+    const inp = acState.inp;
+    inp.value = acState.items[+it.dataset.i];
+    closeAc(); inp.focus();
+  });
+  window.addEventListener("scroll", () => { if (!dd.classList.contains("hidden")) closeAc(); }, true);
+  return dd;
+}
+function closeAc() { const dd = document.getElementById("acDropdown"); if (dd) dd.classList.add("hidden"); acState = null; }
+function bindTitleAutocomplete(inp) {
+  if (!inp) return;
+  const dd = ensureAcDropdown();
+  let active = -1;
+  const paint = () => [...dd.children].forEach((el, i) => el.classList.toggle("on", i === active));
+  const show = () => {
+    const q = inp.value.trim().toLowerCase();
+    const cat = inp.closest("tr")?.querySelector(".er-cat")?.value || ""; // 현재 선택된 카테고리
+    let items = q ? titleSuggestList.filter(t => t.toLowerCase().includes(q)) : [];
+    if (cat) items = items.slice().sort((a, b) => (titleCatMap[b]?.has(cat) ? 1 : 0) - (titleCatMap[a]?.has(cat) ? 1 : 0)); // 그 카테고리에서 쓰던 내용 우선
+    items = items.slice(0, 8);
+    if (!items.length) { closeAc(); return; }
+    acState = { inp, items }; active = -1;
+    dd.innerHTML = items.map((t, i) => `<div class="ac-item" data-i="${i}">${esc(t)}</div>`).join("");
+    const r = inp.getBoundingClientRect();
+    dd.style.left = r.left + "px"; dd.style.top = (r.bottom + 2) + "px"; dd.style.minWidth = r.width + "px";
+    dd.classList.remove("hidden");
+  };
+  inp.addEventListener("input", show);
+  inp.addEventListener("focus", show);
+  inp.addEventListener("blur", () => setTimeout(closeAc, 120));
+  inp.addEventListener("keydown", (e) => {
+    if (dd.classList.contains("hidden") || !acState) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); active = Math.min(active + 1, acState.items.length - 1); paint(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); active = Math.max(active - 1, -1); paint(); }
+    else if (e.key === "Enter" && active >= 0) { e.preventDefault(); e.stopPropagation(); inp.value = acState.items[active]; closeAc(); }
+    else if (e.key === "Tab") { if (active >= 0) inp.value = acState.items[active]; closeAc(); } // 하이라이트된 것만 채움, 없으면 입력값 그대로 · Tab 기본대로 다음 칸
+    else if (e.key === "Escape") { e.stopPropagation(); closeAc(); }
+  });
+}
 function bindEditorRow(tr) {
+  refreshTitleSuggest();
+  bindTitleAutocomplete(tr.querySelector(".er-title"));
   const typeSel = tr.querySelector(".er-type");
   typeSel.addEventListener("change", () => { tr.querySelector(".er-cat").innerHTML = catOptions(typeSel.value, null); });
   const amtInp = tr.querySelector(".er-amt");
@@ -1925,7 +2055,7 @@ function bindEditorRow(tr) {
     const dateInp = tr.querySelector(".er-date");
     let date = tr.dataset.date;
     if (dateInp) {
-      date = smartDate(dateInp.value, curMonth.getFullYear());
+      date = smartDate(dateInp.value, new Date().getFullYear()); // 연도 생략 시 올해 기준 (연도 입력 시 그 해)
       if (date === null) { toast("날짜 형식을 확인하세요 (예: 260908, 9/8)"); return; }
     }
     if (!date) { toast("날짜를 입력하세요"); return; }
@@ -1954,8 +2084,10 @@ function bindEditorRow(tr) {
   };
   tr.querySelector(".er-save").addEventListener("click", saveFn);
   tr.querySelector(".er-cancel").addEventListener("click", () => render());
-  tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
-  amtInp.focus(); amtInp.select(); // 추가·수정 모두 금액부터 커서
+  tr.querySelectorAll("input, select").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
+  const dateInp = tr.querySelector(".er-date");
+  if (!tr.dataset.eid && dateInp) { dateInp.focus(); dateInp.select(); } // 추가: 날짜부터 (전체선택으로 바로 수정)
+  else { amtInp.focus(); amtInp.select(); } // 수정: 금액부터 (더블클릭 시엔 그 칼럼으로 덮어씀)
 }
 
 function bindRowActions(root) {
@@ -1979,7 +2111,7 @@ function bindRowActions(root) {
       }
       const inList = !!cur.closest("#listBody");
       const temp = document.createElement("tbody");
-      temp.innerHTML = editorRowHtml(e, inList, false, true);
+      temp.innerHTML = editorRowHtml(e, inList, true, true); // 수정 모드에서도 날짜를 입력칸으로 (더블클릭 커서 대상)
       const er = temp.firstElementChild;
       cur.replaceWith(er);
       bindEditorRow(er);
@@ -1995,9 +2127,18 @@ function bindRowActions(root) {
       save();
       updateChkAll();
     });
-    tr.addEventListener("dblclick", (ev) => { // 행 더블클릭 = 수정 (체크박스 클릭은 제외)
+    tr.addEventListener("dblclick", (ev) => { // 행 더블클릭 = 수정 (더블클릭한 칸에 커서)
       if (ev.target.closest("input,button,label")) return;
-      tr.querySelector(".edit")?.click();
+      const td = ev.target.closest("td");
+      const colIdx = td ? [...tr.children].indexOf(td) : -1;
+      tr.querySelector(".edit")?.click(); // 편집행 생성 (기본은 금액 포커스)
+      const fieldByCol = { 0: ".er-date", 1: ".er-type", 2: ".er-cat", 3: ".er-amt", 4: ".er-title", 5: ".er-who" }; // 날짜·구분·카테고리·금액·내용·멤버
+      const sel = fieldByCol[colIdx];
+      if (sel) {
+        const er = document.querySelector(`.edit-row[data-eid="${id}"]`);
+        const f = er && er.querySelector(sel);
+        if (f) { f.focus(); if (f.select) f.select(); }
+      }
     });
     tr.addEventListener("dragstart", (ev) => {
       const multi = selRows.has(id) && selVisibleIds().length > 1; // 선택된 행을 끌면 선택 전체 이동
@@ -3074,6 +3215,291 @@ async function fileToEntries(nameOrFile, buf) {
   return { all, skipped, badSheets, budgets: foundBudgets, starts: foundStarts, fixed: foundFixed, tvTrips: foundTvTrips, tvItems: foundTvItems, stocks: foundStocks, savings: foundSavings, pension: foundPension, estates: foundEstates, loans: foundLoans, regionTx: foundRegionTx, regionCards: foundRegionCards, legacy: monthSheets.length > 0 };
 }
 
+/* ═══════════ 암호화 xlsx(여민전) 복호화 — ECMA-376 Agile, 순수 JS (SHA1+AES-128-CBC+CFB) ═══════════ */
+function aq_sha1(bytes) {
+  const ml = bytes.length * 8, w8 = Array.from(bytes); w8.push(0x80);
+  while (w8.length % 64 !== 56) w8.push(0);
+  for (let i = 7; i >= 0; i--) w8.push((ml / Math.pow(2, i * 8)) & 0xff);
+  let h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE, h3 = 0x10325476, h4 = 0xC3D2E1F0;
+  const rol = (n, c) => ((n << c) | (n >>> (32 - c))) >>> 0;
+  for (let i = 0; i < w8.length; i += 64) {
+    const w = new Array(80);
+    for (let j = 0; j < 16; j++) w[j] = ((w8[i+j*4]<<24)|(w8[i+j*4+1]<<16)|(w8[i+j*4+2]<<8)|(w8[i+j*4+3]))>>>0;
+    for (let j = 16; j < 80; j++) w[j] = rol(w[j-3]^w[j-8]^w[j-14]^w[j-16], 1);
+    let a=h0,b=h1,c=h2,d=h3,e=h4;
+    for (let j=0;j<80;j++){ let f,k; if(j<20){f=(b&c)|((~b)&d);k=0x5A827999;}else if(j<40){f=b^c^d;k=0x6ED9EBA1;}else if(j<60){f=(b&c)|(b&d)|(c&d);k=0x8F1BBCDC;}else{f=b^c^d;k=0xCA62C1D6;} const t=(rol(a,5)+f+e+k+w[j])>>>0; e=d;d=c;c=rol(b,30);b=a;a=t; }
+    h0=(h0+a)>>>0;h1=(h1+b)>>>0;h2=(h2+c)>>>0;h3=(h3+d)>>>0;h4=(h4+e)>>>0;
+  }
+  const out = new Uint8Array(20);
+  [h0,h1,h2,h3,h4].forEach((h,i)=>{ out[i*4]=(h>>>24)&255;out[i*4+1]=(h>>>16)&255;out[i*4+2]=(h>>>8)&255;out[i*4+3]=h&255; });
+  return out;
+}
+const AQ_AES = (() => {
+  const sbox=new Uint8Array(256), inv=new Uint8Array(256);
+  (function(){ let p=1; do{ p=(p^(p<<1)^(p&0x80?0x11b:0))&0xff; let q=p, x=0; }while(false);
+    // 표준 S-box 생성
+    let pp=1,qq=1;
+    do{ pp=pp^(pp<<1)^(pp&0x80?0x11b:0); pp&=0xff; qq^=qq<<1;qq^=qq<<2;qq^=qq<<4;qq&=0xff; if(qq&0x80)qq^=0x09;
+      const x=qq^((qq<<1|qq>>>7)&0xff)^((qq<<2|qq>>>6)&0xff)^((qq<<3|qq>>>5)&0xff)^((qq<<4|qq>>>4)&0xff)^0x63; sbox[pp]=x&0xff; }while(pp!==1);
+    sbox[0]=0x63; for(let i=0;i<256;i++) inv[sbox[i]]=i; })();
+  const mul=(a,b)=>{let r=0;for(let i=0;i<8;i++){if(b&1)r^=a;const hi=a&0x80;a=(a<<1)&0xff;if(hi)a^=0x1b;b>>=1;}return r&0xff;};
+  const rcon=[0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80,0x1b,0x36];
+  function expand(key){ const w=new Array(44); for(let i=0;i<4;i++) w[i]=[key[4*i],key[4*i+1],key[4*i+2],key[4*i+3]];
+    for(let i=4;i<44;i++){ let t=w[i-1].slice(); if(i%4===0){ t=[t[1],t[2],t[3],t[0]].map(x=>sbox[x]); t[0]^=rcon[i/4-1]; } w[i]=w[i-4].map((x,j)=>x^t[j]); } return w; }
+  function decBlock(inp,w){ let s=[[],[],[],[]]; for(let i=0;i<16;i++) s[i%4][(i/4)|0]=inp[i];
+    const addRK=(r)=>{ for(let c=0;c<4;c++) for(let row=0;row<4;row++) s[row][c]^=w[r*4+c][row]; }; addRK(10);
+    for(let round=9;round>=1;round--){ for(let row=1;row<4;row++){ const t=s[row].slice(); for(let c=0;c<4;c++) s[row][c]=t[(c-row+4)%4]; }
+      for(let row=0;row<4;row++) for(let c=0;c<4;c++) s[row][c]=inv[s[row][c]]; addRK(round);
+      for(let c=0;c<4;c++){ const a0=s[0][c],a1=s[1][c],a2=s[2][c],a3=s[3][c];
+        s[0][c]=mul(a0,14)^mul(a1,11)^mul(a2,13)^mul(a3,9); s[1][c]=mul(a0,9)^mul(a1,14)^mul(a2,11)^mul(a3,13);
+        s[2][c]=mul(a0,13)^mul(a1,9)^mul(a2,14)^mul(a3,11); s[3][c]=mul(a0,11)^mul(a1,13)^mul(a2,9)^mul(a3,14); } }
+    for(let row=1;row<4;row++){ const t=s[row].slice(); for(let c=0;c<4;c++) s[row][c]=t[(c-row+4)%4]; }
+    for(let row=0;row<4;row++) for(let c=0;c<4;c++) s[row][c]=inv[s[row][c]]; addRK(0);
+    const out=new Uint8Array(16); for(let i=0;i<16;i++) out[i]=s[i%4][(i/4)|0]; return out; }
+  return { expand, decBlock };
+})();
+function aq_cbcDec(key, iv, data){ const w=AQ_AES.expand(key); const out=new Uint8Array(data.length); let prev=iv;
+  for(let i=0;i<data.length;i+=16){ const block=data.subarray(i,i+16); const dec=AQ_AES.decBlock(block,w); for(let j=0;j<16;j++) out[i+j]=dec[j]^prev[j]; prev=block; } return out; }
+function aq_readCFB(u8){ const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength);
+  const secSize=1<<dv.getUint16(30,true), miniSize=1<<dv.getUint16(32,true);
+  const dirStart=dv.getUint32(48,true), miniCut=dv.getUint32(56,true), miniFatStart=dv.getUint32(60,true), difStart=dv.getUint32(68,true), numDif=dv.getUint32(72,true);
+  const secOff=(s)=>512+s*secSize; const fatSectors=[];
+  for(let i=0;i<109;i++){ const s=dv.getUint32(76+i*4,true); if(s===0xFFFFFFFF)break; fatSectors.push(s); }
+  let ds=difStart; for(let n=0;n<numDif&&ds!==0xFFFFFFFE&&ds!==0xFFFFFFFF;n++){ const base=secOff(ds); for(let i=0;i<secSize/4-1;i++){ const s=dv.getUint32(base+i*4,true); if(s!==0xFFFFFFFF) fatSectors.push(s); } ds=dv.getUint32(base+secSize-4,true); }
+  const fat=[]; for(const fs of fatSectors){ const base=secOff(fs); for(let i=0;i<secSize/4;i++) fat.push(dv.getUint32(base+i*4,true)); }
+  const chain=(start)=>{ const o=[]; let s=start; while(s!==0xFFFFFFFE&&s!==0xFFFFFFFF&&s<fat.length){ o.push(s); s=fat[s]; } return o; };
+  const readChain=(start)=>{ const secs=chain(start); const o=new Uint8Array(secs.length*secSize); secs.forEach((s,i)=>o.set(u8.subarray(secOff(s),secOff(s)+secSize),i*secSize)); return o; };
+  const dirBytes=readChain(dirStart); const entries=[];
+  for(let off=0;off+128<=dirBytes.length;off+=128){ const nameLen=dirBytes[off+64]|(dirBytes[off+65]<<8); if(!nameLen)continue;
+    let name=''; for(let i=0;i<nameLen-2;i+=2) name+=String.fromCharCode(dirBytes[off+i]|(dirBytes[off+i+1]<<8));
+    const dv2=new DataView(dirBytes.buffer,dirBytes.byteOffset+off,128); entries.push({name,type:dirBytes[off+66],startSec:dv2.getUint32(116,true),size:dv2.getUint32(120,true)}); }
+  const root=entries.find(e=>e.type===5); const miniStream=root?readChain(root.startSec):new Uint8Array(); const miniFat=[];
+  { const mb=readChain(miniFatStart); const mdv=new DataView(mb.buffer,mb.byteOffset,mb.byteLength); for(let i=0;i<mb.length/4;i++) miniFat.push(mdv.getUint32(i*4,true)); }
+  const readMini=(start,size)=>{ const o=new Uint8Array(size); let s=start,pos=0; while(s!==0xFFFFFFFE&&s!==0xFFFFFFFF&&pos<size){ const c=miniStream.subarray(s*miniSize,s*miniSize+miniSize); o.set(c.subarray(0,Math.min(miniSize,size-pos)),pos); pos+=miniSize; s=miniFat[s]; } return o; };
+  const streams={}; for(const e of entries){ if(e.type!==2)continue; streams[e.name]=e.size<miniCut?readMini(e.startSec,e.size):readChain(e.startSec).subarray(0,e.size); } return streams;
+}
+function aq_b64(b64){ const bin=atob(b64); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u; }
+function aq_u16(str){ const o=new Uint8Array(str.length*2); for(let i=0;i<str.length;i++){ const c=str.charCodeAt(i); o[i*2]=c&0xff; o[i*2+1]=(c>>8)&0xff; } return o; }
+function aq_cat(...a){ let n=a.reduce((s,x)=>s+x.length,0); const o=new Uint8Array(n); let p=0; for(const x of a){ o.set(x,p); p+=x.length; } return o; }
+function aq_le32(n){ return new Uint8Array([n&255,(n>>8)&255,(n>>16)&255,(n>>>24)&255]); }
+function aq_attr(xml,tag,name){ const m=xml.match(new RegExp('<'+tag+'\\b[^>]*'+name+'="([^"]*)"')); return m?m[1]:null; }
+function agileDecryptXlsx(fileU8, password){
+  const st=aq_readCFB(fileU8), info=st['EncryptionInfo'], pkg=st['EncryptedPackage'];
+  if(!info||!pkg) throw new Error('암호화 정보가 없어요 (여민전 파일이 맞나요?)');
+  const xml=new TextDecoder().decode(info.subarray(8));
+  const kSalt=aq_b64(aq_attr(xml,'keyData','saltValue')), spin=+aq_attr(xml,'p:encryptedKey','spinCount');
+  const pSalt=aq_b64(aq_attr(xml,'p:encryptedKey','saltValue')), encKey=aq_b64(aq_attr(xml,'p:encryptedKey','encryptedKeyValue'));
+  const keyLen=(+aq_attr(xml,'p:encryptedKey','keyBits'))/8;
+  let H=aq_sha1(aq_cat(pSalt, aq_u16(password))); for(let i=0;i<spin;i++) H=aq_sha1(aq_cat(aq_le32(i),H));
+  const bk=new Uint8Array([0x14,0x6e,0x0b,0xe7,0xab,0xac,0xd0,0xd6]);
+  const aesKey=aq_sha1(aq_cat(H,bk)).subarray(0,keyLen);
+  const secret=aq_cbcDec(aesKey,pSalt,encKey).subarray(0,keyLen);
+  const viB=new Uint8Array([0xfe,0xa7,0xd2,0x76,0x3b,0x4b,0x9e,0x79]), vhB=new Uint8Array([0xd7,0xaa,0x0f,0x6d,0x30,0x61,0x34,0x4e]);
+  const vin=aq_cbcDec(aq_sha1(aq_cat(H,viB)).subarray(0,keyLen),pSalt,aq_b64(aq_attr(xml,'p:encryptedKey','encryptedVerifierHashInput')));
+  const vh=aq_cbcDec(aq_sha1(aq_cat(H,vhB)).subarray(0,keyLen),pSalt,aq_b64(aq_attr(xml,'p:encryptedKey','encryptedVerifierHashValue')));
+  const vinHash=aq_sha1(vin.subarray(0,16)); let ok=true; for(let i=0;i<20;i++) if(vinHash[i]!==vh[i]) ok=false;
+  if(!ok) throw new Error('비밀번호가 틀렸어요');
+  const total=new DataView(pkg.buffer,pkg.byteOffset,8).getUint32(0,true), enc=pkg.subarray(8), out=new Uint8Array(enc.length);
+  for(let si=0,off=0;off<enc.length;si++,off+=4096){ const iv=aq_sha1(aq_cat(kSalt,aq_le32(si))).subarray(0,16); out.set(aq_cbcDec(secret,iv,enc.subarray(off,off+4096)),off); }
+  return out.subarray(0,total);
+}
+
+function findHdrRow(rows, re1, re2) { return rows.findIndex(r => r.some(c => re1.test(String(c))) && r.some(c => re2.test(String(c)))); }
+function parseYeominSheet(sheet) { // 여민전: 거래일시·거래방식(결제→사용/충전)·거래금액·가맹점명
+  const rows = sheet.rows, hi = findHdrRow(rows, /거래일시/, /가맹점|결제처/);
+  if (hi < 0) return null;
+  const H = rows[hi].map(c => String(c)), col = (re) => H.findIndex(c => re.test(c));
+  const cD = col(/거래일시/), cW = col(/거래방식/), cA = col(/거래금액/), cN = col(/가맹점/);
+  const out = [];
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i], dm = String(r[cD] || "").match(/(\d{4})[.\/\-](\d{1,2})[.\/\-](\d{1,2})/);
+    if (!dm) continue;
+    const amount = Math.round(Number(String(r[cA]).replace(/[^\d.]/g, ""))) || 0;
+    if (!amount) continue;
+    out.push({ date: `${dm[1]}-${dm[2].padStart(2, "0")}-${dm[3].padStart(2, "0")}`, type: /충전/.test(String(r[cW] || "")) ? "충전" : "사용", title: String(r[cN] || "").trim(), amount });
+  }
+  return out;
+}
+function parseOntongSheet(sheet) { // 온통대전: 승인일시·거래유형·사용처·금액
+  const rows = sheet.rows, hi = findHdrRow(rows, /승인일시/, /사용처|가맹점/);
+  if (hi < 0) return null;
+  const H = rows[hi].map(c => String(c)), col = (re) => H.findIndex(c => re.test(c));
+  const cD = col(/승인일시/), cW = col(/거래유형|구분/), cA = col(/금액/), cN = col(/사용처|가맹점/);
+  const out = [];
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i], dm = String(r[cD] || "").match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+    if (!dm) continue;
+    const amount = Math.round(Number(String(r[cA]).replace(/[^\d.]/g, ""))) || 0;
+    if (!amount) continue;
+    const type = /충전|교환|적립/.test(String(r[cW] || "")) ? "충전" : "사용";
+    let name = String(r[cN] || "").trim(); if (!name) name = type === "충전" ? "충전" : "온통대전 사용";
+    out.push({ date: `${dm[1]}-${dm[2].padStart(2, "0")}-${dm[3].padStart(2, "0")}`, type, title: name, amount });
+  }
+  return out;
+}
+
+/* ═══════════ 카드 이용내역 업로드 → 선택 등록 (삼성 xlsx / 현대 HTML) ═══════════ */
+function guessCardCat(title) {
+  const t = String(title || "");
+  const rules = [
+    [/주유|오일뱅크|칼텍스|에스오일|s-?oil|주유소/i, "교통"],
+    [/커피|카페|스타벅스|빽다방|텐퍼센트|투썸|메가|이디야|컴포즈|도너츠|도넛|베이커리|파리바게|뚜레쥬르|공차/i, "카페/간식"],
+    [/약국|치과|의원|병원|한의원|메디|clinic/i, "의료/건강"],
+    [/식당|김밥|순대|국밥|아웃백|맘스터치|버거|치킨|피자|분식|찌개|고기|초밥|한식|중식|일식|맛집|옥\b/i, "외식"],
+    [/gs25|씨유|\bcu\b|이마트|emart|홈플러스|롯데마트|코스트코|하나로|마트|편의점|세븐일레븐|지에스\(gs\)25/i, "장보기"],
+    [/올리브영|다이소|무신사|지그재그|에이블리|쿠팡|11번가|지마켓|옥션|아울렛|스타일/i, "쇼핑"],
+    [/굿네이버스|유니세프|월드비전|기부|후원/i, "경조사"],
+  ];
+  for (const [re, cat] of rules) if (re.test(t)) return cat;
+  return "기타";
+}
+function parseSamsungSheet(sheet) { // 삼성카드: 승인일자·가맹점명·승인금액·취소여부(취소쌍 제외)
+  const rows = sheet.rows, hi = findHdrRow(rows, /승인일자|이용일/, /가맹점/);
+  if (hi < 0) return null;
+  const H = rows[hi].map(c => String(c)), col = (re) => H.findIndex(c => re.test(c));
+  const cD = col(/승인일자|이용일/), cN = col(/가맹점/), cA = col(/승인금액|이용금액|금액/), cC = col(/취소/);
+  const all = [];
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i], dm = String(r[cD] || "").match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+    if (!dm) continue;
+    const amount = Math.round(Number(String(r[cA]).replace(/[^\d.]/g, ""))) || 0;
+    if (!amount) continue;
+    all.push({ date: `${dm[1]}-${dm[2].padStart(2, "0")}-${dm[3].padStart(2, "0")}`, title: String(r[cN] || "").trim(), amount, canceled: cC >= 0 && String(r[cC] || "").trim() !== "-" });
+  }
+  const cancels = all.filter(x => x.canceled).map(x => ({ ...x, used: false })), out = [];
+  for (const x of all) {
+    if (x.canceled) continue;
+    const m = cancels.find(c => !c.used && c.date === x.date && c.title === x.title && c.amount === x.amount);
+    if (m) { m.used = true; continue; }
+    out.push({ date: x.date, title: x.title, amount: x.amount });
+  }
+  return out;
+}
+function parseCardHtml(text) { // 현대카드: HTML 표(.xls). 헤더로 컬럼 탐지 (빈 셀 유지로 인덱스가 밀릴 수 있어 고정 인덱스 X)
+  const doc = new DOMParser().parseFromString(text, "text/html");
+  const rows = [...doc.querySelectorAll("tr")].map(tr => [...tr.querySelectorAll("td,th")].map(td => td.textContent.replace(/\s+/g, " ").trim()));
+  const hi = rows.findIndex(r => r.some(c => /이용일/.test(c)) && r.some(c => /가맹점/.test(c)));
+  if (hi < 0) return [];
+  const H = rows[hi], col = (re) => H.findIndex(c => re.test(c));
+  const cD = col(/이용일/), cN = col(/가맹점/), cUse = col(/이용금액/), cAmt = col(/결제원금/);
+  const out = [];
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i], dm = String(r[cD] || "").match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+    if (!dm) continue;
+    const mcell = String(r[cN] || "");
+    if (/소계|합계/.test(mcell)) continue;
+    let name = mcell.replace(/[\d,]+\s*$/, "").trim();
+    const parts = name.split(" - ");
+    if (parts.length > 1) name = parts.slice(1).join(" - ").trim(); // "PG사 - 실가맹점" → 실가맹점
+    const num = (v) => Math.round(Number(String(v || "").replace(/[^\d.]/g, ""))) || 0;
+    let amount = (cUse >= 0 ? num(r[cUse]) : 0) || (cAmt >= 0 ? num(r[cAmt]) : 0);
+    if (!amount) { const am = mcell.match(/([\d,]+)\s*$/); amount = am ? num(am[1]) : 0; }
+    if (!amount) continue;
+    out.push({ date: `${dm[1]}-${dm[2].padStart(2, "0")}-${dm[3].padStart(2, "0")}`, title: name, amount });
+  }
+  return out;
+}
+window.ciToggleAll = (on) => document.querySelectorAll(".ci-chk").forEach(c => c.checked = on);
+function detectAndParse(sheets) { // 시트에서 카드 종류 자동 판별 → {card, target, txns}
+  const has = (re) => sheets.some(s => s.rows.some(r => r.some(c => re.test(String(c)))));
+  if (has(/거래방식/)) for (const s of sheets) { const t = parseYeominSheet(s); if (t && t.length) return { card: "여민전", target: "region", txns: t }; }
+  if (has(/사용처/)) for (const s of sheets) { const t = parseOntongSheet(s); if (t && t.length) return { card: "온통대전", target: "region", txns: t }; }
+  if (has(/승인일자/)) for (const s of sheets) { const t = parseSamsungSheet(s); if (t && t.length) return { card: "삼성카드", target: "exp", txns: t }; }
+  return null;
+}
+async function handleCardFiles(fileList) { // 여러 파일 · 암호면 비번 · 자동판별해서 한 창에 모음
+  const files = [...fileList]; if (!files.length) return;
+  let pw = null; const all = [], errs = [];
+  for (const f of files) {
+    try {
+      const buf = await f.arrayBuffer(), u8 = new Uint8Array(buf);
+      let det = null;
+      if (u8[0] === 0xD0 && u8[1] === 0xCF) { // 암호화 xlsx (여민전 등)
+        let sheets = null;
+        for (let tries = 0; tries < 3 && !sheets; tries++) {
+          if (pw === null) { const v = await uiPrompt(`<b>${esc(f.name)}</b><br>암호화된 파일이에요. 비밀번호(생년월일 8자리)를 입력하세요`, "", "카드내역 비밀번호"); if (v === null) break; pw = String(v).replace(/\D/g, ""); }
+          try { sheets = await parseXlsxSheets(agileDecryptXlsx(u8, pw).slice().buffer); } catch (e) { errs.push(`${f.name}: ${e.message}`); pw = null; }
+        }
+        if (sheets) det = detectAndParse(sheets);
+      } else if (u8[0] === 0x50 && u8[1] === 0x4B) { // 평문 xlsx (삼성/온통대전)
+        det = detectAndParse(await parseXlsxSheets(buf));
+      } else { // HTML (현대카드)
+        let text; try { text = new TextDecoder("utf-8", { fatal: true }).decode(buf); } catch { text = new TextDecoder("euc-kr").decode(buf); }
+        const t = parseCardHtml(text); if (t.length) det = { card: "현대카드", target: "exp", txns: t };
+      }
+      if (det && det.txns.length) all.push(...det.txns.map(x => ({ ...x, card: det.card, target: det.target })));
+      else if (!det) errs.push(`${f.name}: 카드 형식 인식 못함`);
+    } catch (e) { errs.push(`${f.name}: ${e.message}`); }
+  }
+  if (!all.length) { uiAlert("등록할 내역을 찾지 못했어요." + (errs.length ? `<br><span style='color:var(--muted);font-size:12px'>${errs.map(esc).join("<br>")}</span>` : ""), "카드내역"); return; }
+  await unifiedImportDialog(all, errs);
+}
+async function unifiedImportDialog(txns, errs) {
+  txns.sort((a, b) => b.date.localeCompare(a.date));
+  const whos = [...new Set(["슬구", "쩡이", "현금"].concat(regionTx.map(t => t.who).filter(Boolean), entries.map(e => e.who).filter(Boolean)))];
+  const cats = catList("exp");
+  const ss = "padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:12.5px;background:var(--card);color:var(--text)";
+  const curKey = ym(curMonth), inMonth = (t) => fym(t.date) === curKey;
+  const cardColor = { "삼성카드": "#1428a0", "현대카드": "#111827", "여민전": "#e6522c", "온통대전": "#2a7de1" };
+  const isCharge = (t) => t.target === "region" && t.type === "충전";
+  const kind = (t) => t.target === "region" ? t.type : "지출";
+  const rowH = (t, i) => `<tr>
+    <td style="text-align:center"><input type="checkbox" class="ci-chk" data-i="${i}"${inMonth(t) ? " checked" : ""}></td>
+    <td style="padding:3px 6px;white-space:nowrap;text-align:center"><span class="badge" style="background:${cardColor[t.card] || "var(--muted)"};color:#fff">${esc(t.card)}</span></td>
+    <td style="white-space:nowrap;color:var(--text-2);padding:3px 6px">${t.date}</td>
+    <td style="padding:3px 6px;text-align:center"><span class="badge ${isCharge(t) ? "i" : "e"}">${kind(t)}</span></td>
+    <td style="padding:3px 6px"><input class="ci-title" data-i="${i}" value="${esc(t.title)}" style="width:100%;${ss};box-sizing:border-box;text-align:left"></td>
+    <td style="text-align:right;white-space:nowrap;font-weight:600;color:${isCharge(t) ? "var(--inc)" : "var(--exp)"};padding:3px 6px">${isCharge(t) ? "+" : "-"}${t.amount.toLocaleString()}</td>
+    <td style="padding:3px 6px">${isCharge(t) ? `<span style="color:var(--muted)">-</span>` : `<select class="ci-cat" data-i="${i}" style="${ss}">${cats.map(c => `<option${c === guessCardCat(t.title) ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>`}</td>
+  </tr>`;
+  const byCard = {}; txns.forEach(t => byCard[t.card] = (byCard[t.card] || 0) + 1);
+  const summ = Object.entries(byCard).map(([c, n]) => `${esc(c)} ${n}건`).join(" · ");
+  const msg = `<div class="ci-modal" style="text-align:left">
+    <div style="display:flex;gap:14px;align-items:center;margin-bottom:8px;font-size:12.5px;flex-wrap:wrap">
+      <label>멤버 <select id="ciBulkWho" style="${ss}">${whos.map(w => `<option>${esc(w)}</option>`).join("")}</select></label>
+      <span style="color:var(--muted)">${summ} · <b style="color:var(--accent)">이번 달 ${txns.filter(inMonth).length}건 자동선택</b></span>
+    </div>
+    <div style="max-height:48vh;overflow:auto;border:1px solid var(--border);border-radius:8px">
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+        <thead><tr style="position:sticky;top:0;background:var(--card-2)">
+          <th style="padding:6px 4px;text-align:center"><input type="checkbox" onchange="ciToggleAll(this.checked)" title="전체 선택/해제"></th><th style="padding:6px">카드</th><th style="padding:6px;text-align:left">날짜</th><th style="padding:6px">구분</th><th style="padding:6px;text-align:left">내용(가맹점)</th><th style="padding:6px;text-align:right">금액</th><th style="padding:6px">카테고리</th></tr></thead>
+        <tbody>${txns.map(rowH).join("")}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:8px;color:var(--muted);font-size:11.5px">삼성·현대 = 생활비 지출 · 여민전·온통대전 = 지역카드(사용/충전)에 등록 · 카테고리 자동 추정(수정 가능)${errs && errs.length ? `<br>⚠ ${errs.map(esc).join(" / ")}` : ""}</div>
+  </div>`;
+  const ok = await dialog({ title: "카드/지역화폐 내역 등록", msg, wide: true, buttons: [{ label: "취소", value: false }, { label: "선택 등록", value: true, primary: true }] });
+  if (!ok) return;
+  const who = document.getElementById("ciBulkWho")?.value || "슬구";
+  let nExp = 0, nRegion = 0;
+  document.querySelectorAll(".ci-chk:checked").forEach(chk => {
+    const i = +chk.dataset.i, t = txns[i];
+    const title = (document.querySelector(`.ci-title[data-i="${i}"]`).value.trim()) || t.title;
+    const catEl = document.querySelector(`.ci-cat[data-i="${i}"]`), cat = catEl ? catEl.value : "";
+    if (t.target === "region") {
+      if (!regionCards.includes(t.card)) regionCards.push(t.card);
+      regionTx.push({ id: uid(), card: t.card, who, date: t.date, type: t.type, cat: isCharge(t) ? "" : cat, title, amount: t.amount });
+      nRegion++;
+    } else {
+      entries.push({ id: uid(), seq: ++seqGen, date: t.date, type: "exp", who, cat, title, amount: t.amount });
+      nExp++;
+    }
+  });
+  if (!nExp && !nRegion) { toast("선택된 내역이 없어요"); return; }
+  save(); render();
+  toast(`등록 완료 — 생활비 ${nExp}건${nRegion ? ` · 지역카드 ${nRegion}건` : ""}`);
+}
+// 카드내역 버튼(생활비) · 카드내역 버튼(지역카드) 둘 다 통합 핸들러로 (여러 파일 선택 가능)
+["cardImportBtn", "yeomImportBtn"].forEach(id => {
+  const btn = document.getElementById(id); if (!btn) return;
+  const inputId = id === "cardImportBtn" ? "cardImportInput" : "yeomImportInput";
+  btn.addEventListener("click", () => $(inputId).click());
+  $(inputId).addEventListener("change", async (ev) => {
+    const fs = ev.target.files; ev.target.value = "";
+    try { await handleCardFiles(fs); } catch (err) { uiAlert("파일을 읽지 못했어요: " + esc(err.message), "카드내역"); }
+  });
+});
+
 async function importFile(file) {
   try {
     const buf = await file.arrayBuffer();
@@ -3457,7 +3883,7 @@ function bindFxEditor(tr) {
   };
   tr.querySelector(".er-save").addEventListener("click", saveFn);
   tr.querySelector(".er-cancel").addEventListener("click", renderFixed);
-  tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
+  tr.querySelectorAll("input, select").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
   if (tr.dataset.fid) { const a = tr.querySelector(".fx-j"); a.focus(); a.select(); } // 수정(더블클릭)은 금액부터
   else tr.querySelector(".fx-cat").focus();
 }
@@ -3625,8 +4051,9 @@ function stkEditorHtml(s) {
   return `<tr class="edit-row" data-sid="${s.id || ""}">
     <td><select class="stk-who">${["쩡이", "슬구"].map(w => `<option${(s.who || "쩡이") === w ? " selected" : ""}>${w}</option>`).join("")}</select></td>
     <td><input class="stk-name" value="${esc(s.name || "")}" placeholder="종목명" style="width:130px"></td>
-    <td><select class="stk-market"><option value="KR"${s.market !== "US" ? " selected" : ""}>한국</option><option value="US"${s.market === "US" ? " selected" : ""}>미국</option></select>
-        <input class="stk-code" value="${esc(s.code || "")}" placeholder="005930 / AAPL" style="width:92px"></td>
+    <td><div style="display:flex;gap:5px;align-items:center;min-width:0">
+        <select class="stk-market" style="flex:0 0 74px"><option value="KR"${s.market !== "US" ? " selected" : ""}>한국</option><option value="US"${s.market === "US" ? " selected" : ""}>미국</option></select>
+        <input class="stk-code" value="${esc(s.code || "")}" placeholder="005930 / AAPL" style="flex:1 1 auto;min-width:0"></div></td>
     <td class="amt"><input class="stk-qty" inputmode="decimal" value="${s.qty ? s.qty.toLocaleString("ko-KR") : ""}" placeholder="수량" style="width:70px;text-align:right"></td>
     <td class="amt"><input class="stk-avg" inputmode="decimal" value="${s.avg ? s.avg.toLocaleString("ko-KR") : ""}" placeholder="평단가" style="width:100px;text-align:right"></td>
     <td colspan="4" style="color:var(--muted);font-size:11.5px">코드: 한국 주식 = 종목코드 6자리 · 미국 주식 = 티커</td>
@@ -3656,7 +4083,7 @@ function bindStkEditor(tr) {
   };
   tr.querySelector(".er-save").addEventListener("click", saveFn);
   tr.querySelector(".er-cancel").addEventListener("click", renderStocks);
-  tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
+  tr.querySelectorAll("input, select").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
   tr.querySelector(".stk-name").focus();
 }
 function bindStkRows() {
@@ -3729,7 +4156,7 @@ async function ghTriggerPrices() { // 종목이 바뀌면 시세 수집을 즉�
       if (++tries > 8) return;
       await ghLoadPrices().catch(() => {});
       if (stockPrices.updated !== prevUpd) {
-        if (mainMenu === "savings" && savingsView === "stock") renderStocks();
+        if (mainMenu === "savings" && savingsView === "stock" && !$("stkBody").querySelector(".edit-row")) renderStocks(); // 편집 중이면 건너뜀
         toast("시세 반영 완료");
         return;
       }
@@ -3820,7 +4247,7 @@ function bindRegionEditor(tr) {
   };
   tr.querySelector(".er-save").addEventListener("click", saveFn);
   tr.querySelector(".er-cancel").addEventListener("click", renderRegion);
-  tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
+  tr.querySelectorAll("input, select").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
   tr.querySelector(".rg-title").focus();
 }
 function bindRegionRows() {
@@ -3939,7 +4366,7 @@ function bindEstEditor(tr) {
   };
   tr.querySelector(".er-save").addEventListener("click", saveFn);
   tr.querySelector(".er-cancel").addEventListener("click", renderEstates);
-  tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
+  tr.querySelectorAll("input, select").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
   tr.querySelector(".est-name").focus();
 }
 $("estAddBtn").addEventListener("click", () => addAssetRow("estBody", "eid2", estEditorHtml, bindEstEditor));
@@ -3983,7 +4410,7 @@ function bindLoanEditor(tr) {
   };
   tr.querySelector(".er-save").addEventListener("click", saveFn);
   tr.querySelector(".er-cancel").addEventListener("click", renderLoans);
-  tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
+  tr.querySelectorAll("input, select").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
   tr.querySelector(".loan-name").focus();
 }
 $("loanAddBtn").addEventListener("click", () => addAssetRow("loanBody", "lid", loanEditorHtml, bindLoanEditor));
@@ -4110,7 +4537,7 @@ function bindPenEditor(tr) {
   };
   tr.querySelector(".er-save").addEventListener("click", saveFn);
   tr.querySelector(".er-cancel").addEventListener("click", renderPension);
-  tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
+  tr.querySelectorAll("input, select").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
   tr.querySelector(".pen-name").focus();
 }
 function bindPenRows() {
@@ -4222,7 +4649,7 @@ function bindSavEditor(tr) {
   };
   tr.querySelector(".er-save").addEventListener("click", saveFn);
   tr.querySelector(".er-cancel").addEventListener("click", renderSavings);
-  tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
+  tr.querySelectorAll("input, select").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
   tr.querySelector(".sav-amt").focus();
 }
 function bindSavRows() {
@@ -4282,15 +4709,17 @@ function updateSavingsPh() {
   $("estateView").classList.toggle("hidden", !estate);
   $("loanView").classList.toggle("hidden", !loan);
   $("sectionPlaceholder").classList.toggle("hidden", stock || deposit || pen || estate || loan);
+  // 편집행이 열려 있으면 재렌더 건너뜀 — 입력 도중 백그라운드 재렌더로 입력칸이 사라지는 문제 방지
+  const editing = (bodyId) => !!$(bodyId).querySelector(".edit-row");
   if (stock) {
-    renderStocks();
-    if (ghActive()) ghLoadPrices().then(renderStocks).catch(() => {}); // 최신 시세 반영
-  } else if (deposit) renderSavings();
+    if (!editing("stkBody")) renderStocks();
+    if (ghActive()) ghLoadPrices().then(() => { if (savingsView === "stock" && !editing("stkBody")) renderStocks(); }).catch(() => {}); // 최신 시세 반영
+  } else if (deposit) { if (!editing("savBody")) renderSavings(); }
   else if (pen) {
-    renderPension();
-    if (ghActive()) ghLoadPrices().then(renderPension).catch(() => {});
-  } else if (estate) renderEstates();
-  else if (loan) renderLoans();
+    if (!editing("penBody")) renderPension();
+    if (ghActive()) ghLoadPrices().then(() => { if (savingsView === "pension" && !editing("penBody")) renderPension(); }).catch(() => {});
+  } else if (estate) { if (!editing("estBody")) renderEstates(); }
+  else if (loan) { if (!editing("loanBody")) renderLoans(); }
   else $("phTitle").textContent = `재테크 — ${SAVINGS_NAMES[savingsView]}`;
 }
 document.querySelectorAll("#savingsNav .side-item").forEach(b =>
@@ -4311,6 +4740,18 @@ let travelView = "calendar";
 let tvMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let tvSelected = null; // 선택된 여행 이름
 const tripColor = (id) => DONUT_COLORS[Math.max(0, travelTrips.findIndex(t => t.id === id)) % DONUT_COLORS.length];
+function darkenColor(hex, f) { // 색을 어둡게 (RGB × f)
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(String(hex || ""));
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  return `rgb(${Math.round(((n >> 16) & 255) * f)},${Math.round(((n >> 8) & 255) * f)},${Math.round((n & 255) * f)})`;
+}
+function lightenColor(hex, f) { // 흰색으로 f만큼 섞기 (파스텔)
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(String(hex || ""));
+  if (!m) return hex;
+  const n = parseInt(m[1], 16), mix = (c) => Math.round(c * (1 - f) + 255 * f);
+  return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
+}
 const tripById = (id) => travelTrips.find(t => t.id === id);
 function tripLabel(t) { // 같은 이름 여행이 여럿이면 기간으로 구분해 표시
   if (!t) return "";
@@ -4355,15 +4796,14 @@ function fmtRange(r) { return r ? `${+r[0].slice(5, 7)}/${+r[0].slice(8, 10)}~${
 
 function renderTravel() {
   normalizeTravel();
+  if (travelView === "map") travelView = "calendar"; // 지도 메뉴 제거됨 — 옛 상태 복원 대비
   document.querySelectorAll("#travelNav .side-item").forEach(b => b.classList.toggle("active", b.dataset.tv === travelView));
   $("tvCalView").classList.toggle("hidden", travelView !== "calendar");
   $("tvListView").classList.toggle("hidden", travelView !== "list");
   $("tvStatsView").classList.toggle("hidden", travelView !== "stats");
-  $("tvMapView").classList.toggle("hidden", travelView !== "map");
-  if (travelView === "calendar") renderTravelCal();
-  else if (travelView === "list") renderTravelList();
+  if (travelView === "list") renderTravelList();
   else if (travelView === "stats") renderTravelStats();
-  else renderTravelMap();
+  else renderTravelCal();
 }
 
 /* 여행 지도 — 온라인이면 위성지도(Leaflet+Esri), 오프라인이면 윤곽 지도(d3). 핀 고정 = 우클릭 */
@@ -4499,7 +4939,8 @@ function renderTravelCal() {
   const y = tvMonth.getFullYear(), m = tvMonth.getMonth();
   const mKey2 = ym(tvMonth);
   const mSum = travelItems.filter(i => i.date && i.date.slice(0, 7) === mKey2).reduce((a, i) => a + (i.amount || 0), 0);
-  const mTrips = travelTrips.filter(t => { const r = tripRange(t); return r && r[0].slice(0, 7) <= mKey2 && mKey2 <= r[1].slice(0, 7); });
+  // 그 달에 실제 지출(결제일=item 날짜)이 있는 여행만 — 금액(mSum)과 같은 기준으로 통일
+  const mTrips = travelTrips.filter(t => travelItems.some(i => i.trip === t.id && i.date && i.date.slice(0, 7) === mKey2));
   $("tvCalCards").innerHTML = `
     <div class="stat"><div class="label">${tvMonth.getMonth() + 1}월 여행지출</div><div class="value exp">${fmtWon(mSum)}</div></div>
     <div class="stat"><div class="label">${tvMonth.getMonth() + 1}월 여행</div><div class="value" style="font-size:16px">${mTrips.length ? mTrips.map(t => esc(t.name)).join(" · ") : "없음"}</div></div>`;
@@ -4538,7 +4979,11 @@ function renderTravelCal() {
       const roundL = isStart || col === 0;      // 주 시작이면 왼쪽도 둥글게(새 줄로 이어짐)
       const roundR = isEnd || col === 6;
       const showName = isStart || col === 0;    // 이름은 시작 또는 주 시작에 표시
-      inner += `<div class="tv-band${roundL ? " bl" : ""}${roundR ? " br" : ""}${t.id === tvSelBand ? " sel" : ""}" data-band="${t.id}" data-day="${key}" draggable="true" style="background:${tripColor(t.id)}" title="${esc(t.name)} ${fmtRange(r)} — 클릭: 선택 · 드래그: 이동 · 우클릭: 메뉴">${showName ? esc(t.name) : "&nbsp;"}</div>`;
+      const _bc = tripColor(t.id), _selq = t.id === tvSelBand;
+      // 미선택=파스텔(밝은 톤)+진한 글자, 선택=비비드(원색)+흰 글자 — 구별 확실
+      const _bg = _selq ? _bc : lightenColor(_bc, 0.6);
+      const _tx = _selq ? "#fff" : darkenColor(_bc, 0.45);
+      inner += `<div class="tv-band${roundL ? " bl" : ""}${roundR ? " br" : ""}${_selq ? " tvsel" : ""}" data-band="${t.id}" data-day="${key}" draggable="true" style="background:${_bg};color:${_tx}" title="${esc(t.name)} ${fmtRange(r)} — 클릭: 선택 · 드래그: 이동 · 우클릭: 메뉴">${showName ? esc(t.name) : "&nbsp;"}</div>`;
     }
     html += `<div class="cal-day ${out ? "out" : ""}" data-day="${key}">${inner}</div>`;
   }
@@ -4827,7 +5272,7 @@ function bindTvRangeEditor(tr) {
   };
   tr.querySelector(".er-save").addEventListener("click", saveFn);
   tr.querySelector(".er-cancel").addEventListener("click", renderTvCalDetail);
-  tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
+  tr.querySelectorAll("input, select").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
 }
 
 /* 띠 클릭 시: 그 여행의 전체 내역 패널 */
@@ -4887,7 +5332,7 @@ function bindTvCtEditor(tr) {
   };
   tr.querySelector(".er-save").addEventListener("click", saveFn);
   tr.querySelector(".er-cancel").addEventListener("click", renderTvCalDetail);
-  tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
+  tr.querySelectorAll("input, select").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
   tr.querySelector(".tv-title").focus();
 }
 function bindTvCtRows() {
@@ -4956,7 +5401,7 @@ function bindTvDayEditor(tr) {
   };
   tr.querySelector(".er-save").addEventListener("click", saveFn);
   tr.querySelector(".er-cancel").addEventListener("click", renderTvCalDetail);
-  tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
+  tr.querySelectorAll("input, select").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
   tr.querySelector(".tvd-title").focus();
 }
 function bindTvDayRows() {
@@ -5180,7 +5625,7 @@ function bindTvItemEditor(tr) {
   };
   tr.querySelector(".er-save").addEventListener("click", saveFn);
   tr.querySelector(".er-cancel").addEventListener("click", renderTravelList);
-  tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
+  tr.querySelectorAll("input, select").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); }));
   tr.querySelector(".tv-title").focus();
 }
 function bindTvItems() {
@@ -5205,7 +5650,6 @@ function bindTvItems() {
   });
 }
 $("tvYearSel").addEventListener("change", () => { tvYearFilter = $("tvYearSel").value; renderTravel(); });
-$("tvYearSelMap").addEventListener("change", () => { tvYearFilter = $("tvYearSelMap").value; renderTravel(); });
 $("tvYearSelStats").addEventListener("change", () => { tvYearFilter = $("tvYearSelStats").value; renderTravel(); });
 $("tvAddTripBtn").addEventListener("click", async () => {
   const v = await uiPrompt("여행 이름 (예: 나트랑)", "", "여행 추가");
@@ -5255,11 +5699,7 @@ function renderTravelStats() {
     const k = it.date.slice(0, 7);
     if (perMonth[k]) { perMonth[k].amt += it.amount || 0; perMonth[k].trips.add(it.trip); }
   });
-  vTrips.forEach(t => {
-    const r = tripRange(t);
-    if (!r) return;
-    months.forEach(k => { if (r[0].slice(0, 7) <= k && k <= r[1].slice(0, 7)) perMonth[k].trips.add(t.id); });
-  });
+  // 여행 이름도 지출(결제일)이 있는 달에만 — 달력 집계와 동일 기준 (여행 기간 겹침으로 다른 달에 새지 않게)
   const maxV = Math.max(...months.map(k => perMonth[k].amt), 0);
   $("tvMonthly").innerHTML = "";
   const W = 1500, H = 200, padL = 8, padB = 24, padT = 14;
