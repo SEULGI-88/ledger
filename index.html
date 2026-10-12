@@ -5433,14 +5433,36 @@ document.querySelectorAll("#travelNav .side-item").forEach(b =>
     renderTravel();
   }));
 
+/* 여행에 연결된 생활비 지출 (달력·패널 표시용) — 수정·정산은 가계부에서 */
+function tvLinkedExp(pred) { return entries.filter(e => e.trip && e.type === "exp" && e.date && pred(e)); }
+function tvLinkedRow(e) { // 읽기 전용 행 — ✕ = 연결 해제만
+  const tn = (travelTrips.find(t => t.id === e.trip) || {}).name || "";
+  return `<tr>
+    <td>${e.date.slice(5)}</td>
+    <td><span class="badge e">생활비</span>${tn ? ` <span class="cat-tag">${esc(tn)}</span>` : ""}</td>
+    <td class="title-cell">${esc(e.title || e.cat || "-")}</td>
+    <td class="cat-tag">${esc(e.who || "-")}</td>
+    <td class="amt e">-${(e.amount || 0).toLocaleString()}</td>
+    <td style="width:34px"><div class="row-act"><button class="btn tv-cal-unlink" data-eid="${e.id}" title="연결 해제 (생활비엔 그대로)" style="padding:2px 8px">✕</button></div></td></tr>`;
+}
+function bindTvLinkedRows(root, after) {
+  root.querySelectorAll(".tv-cal-unlink").forEach(b => b.addEventListener("click", () => {
+    const e = entries.find(x => x.id === b.dataset.eid);
+    if (e) delete e.trip;
+    save(); after && after(); toast("연결을 해제했어요 — 생활비엔 그대로 있어요");
+  }));
+}
 /* 여행 달력 — 여행 기간을 색 띠로 표시 */
 function renderTravelCal() {
   $("tvMonthTitle").textContent = `${tvMonth.getFullYear()}년 ${tvMonth.getMonth() + 1}월`;
   const y = tvMonth.getFullYear(), m = tvMonth.getMonth();
   const mKey2 = ym(tvMonth);
-  const mSum = travelItems.filter(i => i.date && i.date.slice(0, 7) === mKey2).reduce((a, i) => a + (i.amount || 0), 0);
+  const mLinked = tvLinkedExp(e => e.date.slice(0, 7) === mKey2);
+  const mSum = travelItems.filter(i => i.date && i.date.slice(0, 7) === mKey2).reduce((a, i) => a + (i.amount || 0), 0)
+    + mLinked.reduce((a, e) => a + (e.amount || 0), 0); // 연결된 생활비 포함
   // 그 달에 실제 지출(결제일=item 날짜)이 있는 여행만 — 금액(mSum)과 같은 기준으로 통일
-  const mTrips = travelTrips.filter(t => travelItems.some(i => i.trip === t.id && i.date && i.date.slice(0, 7) === mKey2));
+  const mTrips = travelTrips.filter(t => travelItems.some(i => i.trip === t.id && i.date && i.date.slice(0, 7) === mKey2)
+    || mLinked.some(e => e.trip === t.id));
   $("tvCalCards").innerHTML = `
     <div class="stat"><div class="label">${tvMonth.getMonth() + 1}월 여행지출</div><div class="value exp">${fmtWon(mSum)}</div></div>
     <div class="stat"><div class="label">${tvMonth.getMonth() + 1}월 여행</div><div class="value" style="font-size:16px">${mTrips.length ? mTrips.map(t => esc(t.name)).join(" · ") : "없음"}</div></div>`;
@@ -5715,17 +5737,20 @@ function renderTvCalDetail() {
   if (!tvCalDay) { d.classList.add("hidden"); return; }
   const dayTrips = travelTrips.filter(t => { const r = tripRange(t); return r && tvCalDay >= r[0] && tvCalDay <= r[1]; });
   const items = travelItems.filter(i => i.date === tvCalDay);
+  const linked = tvLinkedExp(e => e.date === tvCalDay);
   let html = `<h3><b>${tvCalDay}</b>` +
     dayTrips.map(t => `<span class="day-tag" style="background:${tripColor(t.id)};color:#fff">${esc(t.name)}</span>`).join("") +
-    ` <span class="cat-tag">지출 ${fmtWon(items.reduce((a, i) => a + (i.amount || 0), 0))}</span>
+    ` <span class="cat-tag">지출 ${fmtWon(items.reduce((a, i) => a + (i.amount || 0), 0) + linked.reduce((a, e) => a + (e.amount || 0), 0))}</span>
     <button class="add-btn" id="tvDayAddBtn" style="margin-left:auto;padding:4px 12px">＋ 내역</button></h3>
     <table class="ledger-table"><tbody id="tvDayBody">`;
   items.forEach(it => { html += tvDayRow(it); });
+  linked.forEach(e2 => { html += tvLinkedRow(e2); }); // 연결된 생활비 (읽기 전용 — 수정은 가계부에서)
   html += "</tbody></table>";
-  if (!items.length) html += `<div class="empty" style="padding:10px 0">이 날 내역이 없어요 — ＋ 내역으로 추가하세요</div>`;
+  if (!items.length && !linked.length) html += `<div class="empty" style="padding:10px 0">이 날 내역이 없어요 — ＋ 내역으로 추가하세요</div>`;
   d.innerHTML = html;
   d.classList.remove("hidden");
   bindTvDayRows();
+  bindTvLinkedRows(d, renderTvCalDetail);
   $("tvDayAddBtn").addEventListener("click", () => {
     if (!travelTrips.length) { toast("먼저 여행을 만들어주세요 (달력에서 기간을 드래그)"); return; }
     if ($("tvDayBody").querySelector('.edit-row[data-tid=""]')) return;
@@ -5742,17 +5767,20 @@ function renderTvRangePanel() {
   const d = $("tvCalDetail");
   const [s, e] = tvCalRange;
   const items = travelItems.filter(i => i.date && i.date >= s && i.date <= e).sort((a, b) => a.date.localeCompare(b.date));
-  const sum = items.reduce((a, i) => a + (i.amount || 0), 0);
-  let html = `<h3><b>${s} ~ ${e}</b> <span class="cat-tag">${items.length}건</span> · 지출 합계 <b style="color:var(--exp)">${fmtWon(sum)}</b>
+  const linked = tvLinkedExp(e2 => e2.date >= s && e2.date <= e).sort((a, b) => a.date.localeCompare(b.date));
+  const sum = items.reduce((a, i) => a + (i.amount || 0), 0) + linked.reduce((a, e2) => a + (e2.amount || 0), 0);
+  let html = `<h3><b>${s} ~ ${e}</b> <span class="cat-tag">${items.length + linked.length}건</span> · 지출 합계 <b style="color:var(--exp)">${fmtWon(sum)}</b>
     <button class="add-btn" id="tvMakeTripBtn" style="margin-left:auto;padding:4px 12px">＋ 이 기간으로 여행 만들기</button>
     <button class="btn" id="tvRangeCloseBtn" style="padding:4px 10px">✕</button></h3>
     <table class="ledger-table"><tbody id="tvRangeBody">`;
   items.forEach(it => { html += tvRangeRow(it); });
+  linked.forEach(e2 => { html += tvLinkedRow(e2); }); // 연결된 생활비 (읽기 전용)
   html += "</tbody></table>";
-  if (!items.length) html += `<div class="empty" style="padding:10px 0">이 기간의 내역이 없어요</div>`;
+  if (!items.length && !linked.length) html += `<div class="empty" style="padding:10px 0">이 기간의 내역이 없어요</div>`;
   d.innerHTML = html;
   d.classList.remove("hidden");
   bindTvRangeRows();
+  bindTvLinkedRows(d, renderTvRangePanel);
   $("tvRangeCloseBtn").addEventListener("click", () => { tvCalRange = null; renderTvCalDetail(); });
   $("tvMakeTripBtn").addEventListener("click", () => tvAddTripForRange(s, e));
 }
