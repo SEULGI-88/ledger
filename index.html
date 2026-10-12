@@ -248,15 +248,15 @@
   #chartGrid .chart-slot { display:flex; flex-direction:column; }
   #chartGrid .chart-slot.wide { grid-column:1/-1; }
   @media (max-width:820px) { #chartGrid { grid-template-columns:1fr; } }
-  #ctxMenu { position:fixed; z-index:1000; background:var(--card); border:1px solid var(--border); border-radius:10px;
+  #ctxMenu, #ctxSub { position:fixed; z-index:1000; background:var(--card); border:1px solid var(--border); border-radius:10px;
     box-shadow:0 8px 24px rgba(0,0,0,.18); padding:4px; min-width:150px; }
-  #ctxMenu .ctx-item { display:block; width:100%; text-align:left; border:none; background:none; cursor:pointer;
+  #ctxMenu .ctx-item, #ctxSub .ctx-item { display:block; width:100%; text-align:left; border:none; background:none; cursor:pointer;
     font-size:13px; color:inherit; padding:8px 12px; border-radius:6px; font-family:inherit; white-space:nowrap; }
-  #ctxMenu .ctx-item:hover { background:var(--accent-soft); }
-  #ctxMenu .ctx-item.danger { color:var(--exp); }
+  #ctxMenu .ctx-item:hover, #ctxSub .ctx-item:hover, #ctxMenu .ctx-item.has-sub:hover { background:var(--accent-soft); }
+  #ctxMenu .ctx-item.danger, #ctxSub .ctx-item.danger { color:var(--exp); }
   #ctxMenu .ctx-item.danger:hover { background:var(--exp-soft); }
-  #ctxMenu .ctx-sep { height:1px; background:var(--border); margin:4px 6px; }
-  #ctxMenu .ctx-head { padding:5px 12px 3px; font-size:11.5px; font-weight:700; color:var(--muted); }
+  #ctxMenu .ctx-sep, #ctxSub .ctx-sep { height:1px; background:var(--border); margin:4px 6px; }
+  #ctxMenu .ctx-head, #ctxSub .ctx-head { padding:5px 12px 3px; font-size:11.5px; font-weight:700; color:var(--muted); }
   .ac-dropdown { position:fixed; z-index:1000; background:var(--card); border:1px solid var(--border);
     border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.16); padding:4px; max-height:240px; overflow-y:auto; max-width:360px; }
   .ac-dropdown .ac-item { padding:7px 10px; border-radius:7px; cursor:pointer; font-size:13px;
@@ -4323,6 +4323,61 @@ function regionAll() { // 생활비의 지역카드 지출(→자동 충전) + �
     .map(e => ({ id: "auto-" + e.id, card: regionCatToCard(e.cat), who: e.who, date: e.date, type: "충전", title: e.title || "충전", amount: e.amount, auto: true }));
   return autos.concat(regionTx);
 }
+/* ── 카드사 바로가기 링크 (내역 다운로드용) — 이 기기 localStorage 에 저장 ── */
+let cardLinks = (() => {
+  try { const v = JSON.parse(localStorage.getItem("ledgerCardLinks") || "null"); if (Array.isArray(v) && v.length) return v; } catch (e) {}
+  return [
+    { name: "삼성카드", url: "https://www.samsungcard.com" },
+    { name: "현대카드", url: "https://www.hyundaicard.com" },
+    { name: "여민전", url: "" },
+    { name: "대전사랑카드", url: "" }
+  ];
+})();
+function saveCardLinks() { try { localStorage.setItem("ledgerCardLinks", JSON.stringify(cardLinks)); } catch (e) {} }
+async function openCardLink(l) {
+  if (!l.url) { // 주소 미설정 — 한 번 입력받아 저장
+    const v = await uiPrompt(`<b>${esc(l.name)}</b> 홈페이지 주소를 입력하세요<br><span style="font-size:12px;color:var(--muted)">내역 다운로드 페이지 주소를 넣어두면 더 편해요</span>`, "https://", `${esc(l.name)} 주소 설정`);
+    if (!v || !v.trim() || v.trim() === "https://") return;
+    l.url = v.trim();
+    saveCardLinks();
+  }
+  window.open(l.url, "_blank");
+}
+async function manageCardLinks() {
+  const rowHtml2 = (l) => `<div class="cl-row" style="display:flex;gap:6px;margin-bottom:6px;align-items:center">
+      <input class="cl-name" value="${esc(l.name || "")}" placeholder="카드 이름" style="width:110px;padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--card);color:var(--text)">
+      <input class="cl-url" value="${esc(l.url || "")}" placeholder="https://…" style="flex:1;min-width:0;padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--card);color:var(--text)">
+      <button class="cl-del btn" title="삭제" style="padding:4px 9px">🗑</button></div>`;
+  requestAnimationFrame(() => { // 모달 DOM 이 뜬 뒤 동적 바인딩
+    const box = document.getElementById("clRows");
+    if (!box) return;
+    const bindRow = (row) => row.querySelector(".cl-del").addEventListener("click", () => row.remove());
+    box.querySelectorAll(".cl-row").forEach(bindRow);
+    document.getElementById("clAddBtn")?.addEventListener("click", () => {
+      const t = document.createElement("div");
+      t.innerHTML = rowHtml2({ name: "", url: "" });
+      const row = t.firstElementChild;
+      box.appendChild(row);
+      bindRow(row);
+      row.querySelector(".cl-name").focus();
+    });
+  });
+  const ok = await dialog({ title: "카드사 링크 관리", wide: true,
+    msg: `<div id="clRows" style="max-height:44vh;overflow:auto">${cardLinks.map(rowHtml2).join("")}</div>
+      <button id="clAddBtn" class="btn" style="padding:5px 12px;margin-top:2px">＋ 카드 추가</button>
+      <div style="margin-top:8px;font-size:12px;color:var(--muted)">🗑 = 그 줄 삭제 · 이 기기에만 저장돼요</div>`,
+    buttons: [{ label: "취소", value: false }, { label: "저장", value: true, primary: true }] });
+  if (!ok) return;
+  const next = [];
+  document.querySelectorAll("#clRows .cl-row").forEach(row => {
+    const nm = row.querySelector(".cl-name").value.trim();
+    const u = row.querySelector(".cl-url").value.trim();
+    if (nm) next.push({ name: nm, url: u });
+  });
+  cardLinks = next;
+  saveCardLinks();
+  toast("카드사 링크를 저장했어요");
+}
 function renderRegion() {
   const fmt = (n) => Math.round(n).toLocaleString();
   const all = regionAll();
@@ -4332,7 +4387,7 @@ function renderRegion() {
   all.forEach(t => { if (!bal[t.card]) bal[t.card] = { charge: 0, use: 0 }; bal[t.card][t.type === "충전" ? "charge" : "use"] += t.amount || 0; });
   $("regionCards").innerHTML = cards.map(c => {
     const b = bal[c], remain = b.charge - b.use;
-    return `<div class="stat" data-card="${esc(c)}" style="cursor:context-menu" title="우클릭: 이름 변경·삭제"><div class="label">${esc(c)} 남은 금액</div>
+    return `<div class="stat" data-card="${esc(c)}" style="cursor:context-menu" title="우클릭: 이름 변경·삭제"><div class="label">${esc(c)} 남은 금액 <span style="color:var(--muted);font-size:11px">· 전체 누적</span></div>
       <div class="value ${remain >= 0 ? "inc" : "exp"}">${fmt(remain)}원</div>
       <div style="font-size:11px;color:var(--muted);margin-top:2px">충전 ${fmt(b.charge)} · 사용 ${fmt(b.use)}</div></div>`;
   }).join("");
@@ -4346,15 +4401,19 @@ function renderRegion() {
       ]);
     });
   });
-  // 카드별 그룹 → 최신순 내역
-  const tx = [...all].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-  if (!tx.length) { $("regionBody").innerHTML = `<tr><td colspan="8"><div class="empty">내역이 없습니다 — 생활비에서 여민전·대전사랑카드로 지출하면 자동 충전되고, ＋ 추가로 사용 내역을 기록하세요</div></td></tr>`; return; }
+  // 카드별 그룹 → 최신순 내역 — 목록은 상단 ◀▶로 보는 달만 (잔액 카드는 전체 누적 유지)
+  const mKey = ym(curMonth);
+  const tx = [...all].filter(t => (t.date || "").startsWith(mKey))
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  if (!tx.length) { $("regionBody").innerHTML = `<tr><td colspan="8"><div class="empty">${+mKey.slice(5, 7)}월 내역이 없습니다 — ◀▶로 다른 달을 보거나, 생활비에서 충전·＋ 추가로 사용을 기록하세요</div></td></tr>`; return; }
   let html = "";
   cards.forEach(c => {
     const list = tx.filter(t => t.card === c);
     if (!list.length) return;
     const b = bal[c], remain = b.charge - b.use;
-    html += `<tr class="day-sep"><td colspan="8">${esc(c)} · 남은 <b style="color:${remain >= 0 ? "var(--inc)" : "var(--exp)"}">${fmt(remain)}원</b></td></tr>`;
+    const mCh = list.filter(t => t.type === "충전").reduce((a, t) => a + (t.amount || 0), 0);
+    const mUs = list.filter(t => t.type !== "충전").reduce((a, t) => a + (t.amount || 0), 0);
+    html += `<tr class="day-sep"><td colspan="8">${esc(c)} · ${+mKey.slice(5, 7)}월 충전 ${fmt(mCh)} · 사용 ${fmt(mUs)} · <span style="color:var(--muted)">전체 남은</span> <b style="color:${remain >= 0 ? "var(--inc)" : "var(--exp)"}">${fmt(remain)}원</b></td></tr>`;
     list.forEach(t => { html += regionRowHtml(t); });
   });
   $("regionBody").innerHTML = html;
@@ -5438,23 +5497,49 @@ function renderTravelCal() {
 let tvCalTrip = null;
 let ctxOutside = null;
 function closeCtxMenu() {
+  document.getElementById("ctxSub")?.remove();
   const m = document.getElementById("ctxMenu"); if (m) m.remove();
   if (ctxOutside) { document.removeEventListener("mousedown", ctxOutside, true); ctxOutside = null; }
 }
-function showCtxMenu(x, y, items) { // 마우스 옆에 뜨는 작은 컨텍스트 메뉴 (items: [{label, danger, onClick}])
+function showCtxMenu(x, y, items) { // 마우스 옆에 뜨는 작은 컨텍스트 메뉴 (items: [{label, danger, onClick, children}])
   closeCtxMenu();
   const m = document.createElement("div");
   m.id = "ctxMenu";
   m.innerHTML = items.map((it, i) => it.sep ? `<div class="ctx-sep"></div>`
     : it.disabled ? `<div class="ctx-head">${esc(it.label)}</div>`
-    : `<button class="ctx-item${it.danger ? " danger" : ""}" data-i="${i}">${esc(it.label)}</button>`).join("");
+    : `<button class="ctx-item${it.danger ? " danger" : ""}${it.children ? " has-sub" : ""}" data-i="${i}">${esc(it.label)}${it.children ? `<span style="float:right;color:var(--muted);margin-left:14px">▸</span>` : ""}</button>`).join("");
   document.body.appendChild(m);
   const w = m.offsetWidth, h = m.offsetHeight;
   m.style.left = Math.min(x, innerWidth - w - 8) + "px";
   m.style.top = Math.min(y, innerHeight - h - 8) + "px";
-  m.querySelectorAll(".ctx-item").forEach(b => b.addEventListener("click", () => { const it = items[+b.dataset.i]; closeCtxMenu(); it.onClick && it.onClick(); }));
-  // 메뉴 바깥을 눌렀을 때만 닫기 (메뉴 안 클릭은 유지 — 항목 클릭이 먹히도록)
-  ctxOutside = (ev) => { if (!m.contains(ev.target)) closeCtxMenu(); };
+  let sub = null, subFor = -1;
+  const closeSub = () => { if (sub) { sub.remove(); sub = null; subFor = -1; } };
+  const openSub = (btn, it) => { // 항목 오른쪽 옆에 펼침 (공간 없으면 왼쪽)
+    closeSub();
+    sub = document.createElement("div");
+    sub.id = "ctxSub";
+    sub.className = "ctx-submenu";
+    sub.innerHTML = it.children.map((c, j) => c.sep ? `<div class="ctx-sep"></div>`
+      : `<button class="ctx-item${c.danger ? " danger" : ""}" data-j="${j}">${esc(c.label)}</button>`).join("");
+    document.body.appendChild(sub);
+    const r = btn.getBoundingClientRect(), sw = sub.offsetWidth, sh = sub.offsetHeight;
+    sub.style.left = (r.right + sw + 4 <= innerWidth ? r.right + 2 : Math.max(8, r.left - sw - 2)) + "px";
+    sub.style.top = Math.min(r.top - 4, innerHeight - sh - 8) + "px";
+    sub.querySelectorAll(".ctx-item").forEach(sb => sb.addEventListener("click", () => { const c = it.children[+sb.dataset.j]; closeCtxMenu(); c.onClick && c.onClick(); }));
+    subFor = +btn.dataset.i;
+  };
+  m.querySelectorAll(".ctx-item").forEach(b => {
+    const it = items[+b.dataset.i];
+    if (it.children) {
+      b.addEventListener("mouseenter", () => openSub(b, it));
+      b.addEventListener("click", () => openSub(b, it)); // 클릭으로도 펼침 (터치 대비)
+    } else {
+      b.addEventListener("mouseenter", closeSub);
+      b.addEventListener("click", () => { closeCtxMenu(); it.onClick && it.onClick(); });
+    }
+  });
+  // 메뉴 바깥을 눌렀을 때만 닫기 (서브메뉴 포함)
+  ctxOutside = (ev) => { if (!m.contains(ev.target) && !(sub && sub.contains(ev.target))) closeCtxMenu(); };
   setTimeout(() => document.addEventListener("mousedown", ctxOutside, true), 0);
 }
 /* 도움말 — 현재 적용된 단축키 목록을 알림창으로 */
@@ -5480,7 +5565,14 @@ function showShortcutsHelp() {
 {
   const hb = $("helpBtn");
   if (hb) {
-    const openMenu = (x, y) => showCtxMenu(x, y, [{ label: "⌨ 단축키 보기", onClick: showShortcutsHelp }]);
+    const openMenu = (x, y) => showCtxMenu(x, y, [
+      { label: "⌨ 단축키 보기", onClick: showShortcutsHelp },
+      { label: "🔗 카드사 이동", children: [
+        ...cardLinks.map(l => ({ label: `${l.name}${l.url ? "" : " · 주소 미설정"}`, onClick: () => openCardLink(l) })),
+        { sep: true },
+        { label: "✎ 링크 관리 (추가·삭제)", onClick: manageCardLinks }
+      ] }
+    ]);
     hb.addEventListener("click", (e) => { const r = hb.getBoundingClientRect(); openMenu(r.left, r.bottom + 4); });
     hb.addEventListener("contextmenu", (e) => { e.preventDefault(); openMenu(e.clientX, e.clientY); });
   }
