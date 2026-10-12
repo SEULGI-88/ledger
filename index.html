@@ -4385,9 +4385,28 @@ function renderRegion() {
   const bal = {};
   cards.forEach(c => bal[c] = { charge: 0, use: 0 });
   all.forEach(t => { if (!bal[t.card]) bal[t.card] = { charge: 0, use: 0 }; bal[t.card][t.type === "충전" ? "charge" : "use"] += t.amount || 0; });
-  $("regionCards").innerHTML = cards.map(c => {
-    const b = bal[c], remain = b.charge - b.use;
-    return `<div class="stat" data-card="${esc(c)}" style="cursor:context-menu" title="우클릭: 이름 변경·삭제"><div class="label">${esc(c)} 남은 금액 <span style="color:var(--muted);font-size:11px">· 전체 누적</span></div>
+  // 상단 통계: 사람(쩡이/슬구)×카드별로 분리 — 잔액이 남아있거나 보는 달에 내역이 있는 것만 (0원 다 쓴 건 숨김)
+  const mKeyStat = ym(curMonth);
+  const bw = {};
+  all.forEach(t => {
+    const k = (t.who || "-") + "|" + (t.card || "-");
+    if (!bw[k]) bw[k] = { charge: 0, use: 0 };
+    bw[k][t.type === "충전" ? "charge" : "use"] += t.amount || 0;
+  });
+  const whoOrder = ["쩡이", "슬구", "현금"];
+  const whos = [...new Set(all.map(t => t.who || "-"))].sort((a, b) => {
+    const ia = whoOrder.indexOf(a), ib = whoOrder.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+  const combos = [];
+  whos.forEach(w => cards.forEach(c => { if (bw[w + "|" + c]) combos.push([w, c]); }));
+  const statCombos = combos.filter(([w, c]) => {
+    const b = bw[w + "|" + c];
+    return Math.round(b.charge - b.use) !== 0 || all.some(t => (t.who || "-") === w && t.card === c && (t.date || "").startsWith(mKeyStat));
+  });
+  $("regionCards").innerHTML = statCombos.map(([w, c]) => {
+    const b = bw[w + "|" + c], remain = b.charge - b.use;
+    return `<div class="stat" data-card="${esc(c)}" style="cursor:context-menu" title="우클릭: 이름 변경·삭제"><div class="label"><b>${esc(w)}</b> · ${esc(c)} 남은 금액 <span style="color:var(--muted);font-size:11px">· 전체 누적</span></div>
       <div class="value ${remain >= 0 ? "inc" : "exp"}">${fmt(remain)}원</div>
       <div style="font-size:11px;color:var(--muted);margin-top:2px">충전 ${fmt(b.charge)} · 사용 ${fmt(b.use)}</div></div>`;
   }).join("");
