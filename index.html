@@ -5844,17 +5844,20 @@ function renderTvCalTripPanel() {
   const t = tripById(tvCalTrip);
   if (!t) { tvCalTrip = null; d.classList.add("hidden"); return; }
   const items = travelItems.filter(x => x.trip === t.id);
+  const linked = tripLinkedEntries(t.id).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   let html = `<h3><b style="color:${tripColor(t.id)}">${esc(t.name)}</b>
-    <span class="cat-tag">${fmtRange(tripRange(t))}</span> · 지출 ${fmtWon(tripSum(t.id))}
+    <span class="cat-tag">${fmtRange(tripRange(t))}</span> · 지출 ${fmtWon(tripTotal(t.id))}
     <button class="add-btn" id="tvCtAddBtn" style="margin-left:auto;padding:4px 12px">＋ 내역</button>
     <button class="btn" id="tvCtCloseBtn" style="padding:4px 10px">✕</button></h3>
     <table class="ledger-table"><tbody id="tvCtBody">`;
   items.forEach(it => { html += tvItemRow(it).replace('data-tid="', 'data-ctid="'); });
+  linked.forEach(e2 => { html += tvLinkedRow(e2); }); // 연결된 생활비 (읽기 전용 — 수정은 가계부에서)
   html += "</tbody></table>";
-  if (!items.length) html += `<div class="empty" style="padding:10px 0">내역이 없어요 — ＋ 내역으로 추가하세요</div>`;
+  if (!items.length && !linked.length) html += `<div class="empty" style="padding:10px 0">내역이 없어요 — ＋ 내역으로 추가하세요</div>`;
   d.innerHTML = html;
   d.classList.remove("hidden");
   bindTvCtRows();
+  bindTvLinkedRows(d, renderTvCalTripPanel);
   $("tvCtCloseBtn").addEventListener("click", () => { tvCalTrip = null; renderTvCalDetail(); });
   $("tvCtAddBtn").addEventListener("click", () => {
     if ($("tvCtBody").querySelector('.edit-row[data-tid=""]')) return;
