@@ -323,7 +323,7 @@
   /* ═══════════ 모바일 전용 화면 ═══════════ */
   #mApp { display:none; }
   body.mobile #mainMenu, body.mobile #sideNav, body.mobile #savingsNav, body.mobile #idoNav, body.mobile #travelNav,
-  body.mobile #ledgerSection, body.mobile #travelSection, body.mobile #sectionPlaceholder, body.mobile #stockView, body.mobile #savingsView, body.mobile #pensionView, body.mobile #estateView, body.mobile #loanView,
+  body.mobile #ledgerSection, body.mobile #travelSection, body.mobile #sectionPlaceholder, body.mobile #stockView, body.mobile #idoDepView, body.mobile #idoStatsView, body.mobile #savingsView, body.mobile #pensionView, body.mobile #estateView, body.mobile #loanView,
   body.mobile #connectOverlay { display:none !important; } /* 모바일은 GitHub 연결(설정 탭)만 사용 */
   body.mobile { padding:0; }
   body.mobile #mApp { display:flex; flex-direction:column; min-height:100dvh; }
@@ -723,6 +723,39 @@ try {
     </div>
     <p id="stkNote" style="font-size:11.5px;color:var(--muted);margin-top:8px"></p>
   </div>
+  <div id="idoDepView" class="hidden">
+    <div class="stats" id="idoDepCards" style="margin-bottom:12px"></div>
+    <div class="card table-scroll">
+      <table class="ledger-table">
+        <thead><tr>
+          <th>은행</th><th>계좌번호</th><th>상품명</th><th>종류</th><th class="amt-h">금액</th>
+          <th class="amt-h">연이율</th><th>가입일</th><th>만기일</th><th>메모</th>
+          <th style="text-align:right"><button class="add-btn" id="idoDepAddBtn" style="padding:5px 14px">＋ 추가</button></th>
+        </tr></thead>
+        <tbody id="idoDepBody"></tbody>
+      </table>
+    </div>
+    <p style="font-size:11.5px;color:var(--muted);margin-top:8px">예금=예치금 · 적금=월 납입액 · 예수금=증권사 현금(금리·기간 비움) — 행 더블클릭으로 수정</p>
+  </div>
+  <div id="idoStatsView" class="hidden">
+    <div class="stats" id="idoStatCards" style="margin-bottom:12px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px" id="idoChartGrid">
+      <div class="card" style="padding:14px 16px">
+        <h3 style="font-size:14px;margin-bottom:2px">자산 구성</h3>
+        <div id="idoAssetSub" style="font-size:12px;color:var(--muted);margin-bottom:8px"></div>
+        <div id="idoAssetDonut"></div>
+      </div>
+      <div class="card" style="padding:14px 16px">
+        <h3 style="font-size:14px;margin-bottom:2px">계좌·종목별 금액</h3>
+        <div id="idoBarSub" style="font-size:12px;color:var(--muted);margin-bottom:8px"></div>
+        <div id="idoBars"></div>
+      </div>
+    </div>
+    <div class="card" style="padding:14px 16px">
+      <h3 style="font-size:14px;margin-bottom:8px">계좌별 만기 예상 <span style="font-size:11px;color:var(--muted);font-weight:400">· "지금"은 약정이율로 오늘까지 경과분 — 실제 중도해지이율은 은행별로 더 낮을 수 있어요</span></h3>
+      <div id="idoStatBody"></div>
+    </div>
+  </div>
   <div id="sectionPlaceholder" class="card hidden" style="padding:60px 20px;text-align:center;margin-top:8px">
     <div style="font-size:38px;margin-bottom:12px">🚧</div>
     <h2 id="phTitle" style="font-size:17px;margin-bottom:6px"></h2>
@@ -828,7 +861,9 @@ let entries = [];   // {id, date:"YYYY-MM-DD", type:"exp"|"inc", cat, title, amo
 let fixedItems = []; // 고정지출: {id, cat, name, who, amt, period, year} — 엑셀 "고정지출" 시트로 저장
 let travelTrips = []; // 여행 목록: {name, start, end} — 엑셀 "여행목록" 시트
 let travelItems = []; // 여행 내역: {id, trip, date, title, amount, memo} — 엑셀 "여행내역" 시트
-let stocks = []; // 주식: {id, who(쩡이/슬구), market(KR/US), code, name, avg, qty} — 엑셀 "주식" 시트
+let stocks = []; // 주식: {id, who(쩡이/슬구/이도), market(KR/US), code, name, avg, qty} — 엑셀 "주식" 시트 (재테크·이도계좌 공용, who 로 분리)
+let stockScope = "fam"; // 주식 화면 스코프: fam=재테크(쩡이/슬구), ido=이도계좌 — 같은 기능, 데이터는 소유자로 분리
+let idoDeposits = []; // 이도 예금: {id, bank, acct, name, kind(예금/적금/예수금), amount, rate, start, end, memo} — 엑셀 "이도예금" 시트
 let stockPrices = { prices: {}, usdkrw: null, updated: null }; // 시세 — GitHub Actions가 장 마감 후 prices.json 갱신
 let stocksDirty = false; // 종목 목록이 바뀌면 stocks.json 재업로드
 let savings = []; // 적금/예금: {id, who, kind(적금/예금), amount(월납입 또는 예치금), rate(연이율%), start, end, taxFree} — 엑셀 "적금" 시트
@@ -1002,7 +1037,7 @@ function b64FromBytes(bytes) {
   return btoa(s);
 }
 function mirrorToLocal() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx, rc: regionCards })); } catch (e) {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx, rc: regionCards, idoD: idoDeposits })); } catch (e) {}
 }
 async function ghLoad(keepMonth) { // true 반환 = 불러옴, false = 저장소에 파일 없음
   const res = await fetch(ghApiUrl() + "?ref=" + (ghCfg.branch || "main") + "&t=" + Date.now(), { headers: ghHeaders(), cache: "no-store" });
@@ -1011,8 +1046,8 @@ async function ghLoad(keepMonth) { // true 반환 = 불러옴, false = 저장소
   const j = await res.json();
   ghSha = j.sha;
   const bin = Uint8Array.from(atob(String(j.content || "").replace(/\n/g, "")), c => c.charCodeAt(0));
-  const { all, budgets: b, starts, fixed, tvTrips, tvItems, stocks: stk, savings: sav, pension: pen, estates: est, loans: lo, regionTx: rtx, regionCards: rc } = await fileToEntries(ghCfg.path || "가계부DB.xlsx", bin.buffer);
-  entries = all; budgets = b || {}; monthStarts = starts || {}; fixedItems = fixed || []; travelTrips = tvTrips || []; travelItems = tvItems || []; stocks = stk || []; savings = sav || []; pension = pen || []; estates = est || []; loans = lo || []; regionTx = rtx || []; if (rc && rc.length) regionCards = rc;
+  const { all, budgets: b, starts, fixed, tvTrips, tvItems, stocks: stk, savings: sav, pension: pen, estates: est, loans: lo, regionTx: rtx, regionCards: rc, idoDeps: idoD } = await fileToEntries(ghCfg.path || "가계부DB.xlsx", bin.buffer);
+  entries = all; budgets = b || {}; monthStarts = starts || {}; fixedItems = fixed || []; travelTrips = tvTrips || []; travelItems = tvItems || []; stocks = stk || []; savings = sav || []; pension = pen || []; estates = est || []; loans = lo || []; regionTx = rtx || []; idoDeposits = idoD || []; if (rc && rc.length) regionCards = rc;
   initUndoBaseline();
   if (!keepMonth) {
     const latest = entries.reduce((a, e) => e.date > a ? e.date : a, "");
@@ -1057,13 +1092,13 @@ async function ghWrite() {
 /* ═══════════ 되돌리기 (Ctrl/Cmd+Z) — 저장 직전 상태를 쌓아 복원 ═══════════ */
 let undoStack = [], committedSnap = null, undoing = false;
 function snapshotData() {
-  return JSON.stringify({ entries, budgets, monthStarts, fixedItems, travelTrips, travelItems, stocks, savings, pension, estates, loans, regionTx, regionCards });
+  return JSON.stringify({ entries, budgets, monthStarts, fixedItems, travelTrips, travelItems, stocks, savings, pension, estates, loans, regionTx, regionCards, idoDeposits });
 }
 function restoreData(s) {
   const d = JSON.parse(s);
   entries = d.entries || []; budgets = d.budgets || {}; monthStarts = d.monthStarts || {};
   fixedItems = d.fixedItems || []; travelTrips = d.travelTrips || []; travelItems = d.travelItems || [];
-  stocks = d.stocks || []; savings = d.savings || []; pension = d.pension || []; estates = d.estates || []; loans = d.loans || []; regionTx = d.regionTx || []; if (d.regionCards) regionCards = d.regionCards;
+  stocks = d.stocks || []; savings = d.savings || []; pension = d.pension || []; estates = d.estates || []; loans = d.loans || []; regionTx = d.regionTx || []; idoDeposits = d.idoDeposits || []; if (d.regionCards) regionCards = d.regionCards;
 }
 function initUndoBaseline() { committedSnap = snapshotData(); undoStack = []; }
 function doUndo() {
@@ -1073,7 +1108,7 @@ function doUndo() {
   committedSnap = snapshotData();
   save();
   render();
-  if (mainMenu === "travel") renderTravel(); else if (mainMenu === "savings") updateSavingsPh();
+  if (mainMenu === "travel") renderTravel(); else if (mainMenu === "savings") updateSavingsPh(); else if (mainMenu === "ido") updateIdoPh();
   undoing = false;
   toast("되돌렸어요 (⌘Z)");
 }
@@ -1101,12 +1136,12 @@ function save() {
   }
   if (fsMode && fileHandle) {
     // 빠른 표시용 미러 (다음 실행 때 연결 전에도 데이터가 바로 보이게)
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx, rc: regionCards })); } catch (e) {}
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx, rc: regionCards, idoD: idoDeposits })); } catch (e) {}
     fileState("저장 중…");
     clearTimeout(writeTimer);
     writeTimer = setTimeout(writeToFile, 500);
   } else {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx, rc: regionCards }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx, rc: regionCards, idoD: idoDeposits }));
   }
 }
 
@@ -1392,6 +1427,20 @@ function buildXlsx() {
       enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${tb}</sheetData></worksheet>`)]);
     sheetRefs.push({ mon: "주식", idx });
   }
+  if (idoDeposits.length) { // 이도예금 시트: 은행/계좌번호/상품명/종류/금액/연이율/가입일/만기일/메모
+    const idx = sheetRefs.length + 1;
+    let tb = `<row r="1">` + ["은행", "계좌번호", "상품명", "종류", "금액", "연이율", "가입일", "만기일", "메모", "월별납입"].map((h, ci) => S(colLetter(ci) + "1", h, 3)).join("") + `</row>`;
+    idoDeposits.forEach((d, i) => {
+      const r = i + 2;
+      tb += `<row r="${r}">` + S("A" + r, d.bank || "") + S("B" + r, d.acct || "") + S("C" + r, d.name || "") +
+        S("D" + r, d.kind || "예금") + (d.amount ? N("E" + r, d.amount, 2) : "") + (d.rate ? N("F" + r, d.rate) : "") +
+        S("G" + r, d.start || "") + S("H" + r, d.end || "") + S("I" + r, d.memo || "") +
+        (d.pays && Object.keys(d.pays).length ? S("J" + r, Object.entries(d.pays).map(([k, v]) => k + ":" + v).join(";")) : "") + `</row>`;
+    });
+    fileList.push([`xl/worksheets/sheet${idx}.xml`,
+      enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${tb}</sheetData></worksheet>`)]);
+    sheetRefs.push({ mon: "이도예금", idx });
+  }
 
   const ct = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
@@ -1563,6 +1612,7 @@ function render() {
   if (typeof mainMenu !== "undefined") {
     if (mainMenu === "travel") { try { renderTravel(); } catch (e) {} }
     else if (mainMenu === "savings") { try { updateSavingsPh(); } catch (e) {} }
+    else if (mainMenu === "ido") { try { updateIdoPh(); } catch (e) {} }
   }
 }
 
@@ -2970,6 +3020,7 @@ async function fileToEntries(nameOrFile, buf) {
   const foundTvTrips = [];
   const foundTvItems = [];
   const foundStocks = [];
+  const foundIdoDeps = [];
   const foundSavings = [];
   const foundPension = [];
   const foundEstates = [];
@@ -3109,6 +3160,35 @@ async function fileToEntries(nameOrFile, buf) {
       }
       continue;
     }
+    if (s.name.trim() === "이도예금") {
+      const h = (s.rows[0] || []).map(x => String(x));
+      const c = (kw) => h.findIndex(x => x.includes(kw));
+      const cB = c("은행"), cAc = c("계좌"), cN = c("상품"), cK = c("종류"), cA = c("금액"), cR = c("이율") >= 0 ? c("이율") : c("금리"), cS = c("가입"), cE2 = c("만기"), cM = c("메모"), cP = c("월별납입");
+      const num = (v) => Number(String(v ?? "").replace(/[,원%\s]/g, "")) || 0;
+      const dstr = (v) => { const t = String(v ?? "").trim(); if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t; const n2 = Number(t); if (Number.isFinite(n2) && n2 > 20000) { const dt = new Date(Date.UTC(1899, 11, 30) + n2 * 86400000); return dt.toISOString().slice(0, 10); } return t; };
+      for (const r of s.rows.slice(1)) {
+        const bank = cB >= 0 ? String(r[cB] ?? "").trim() : "";
+        const name = cN >= 0 ? String(r[cN] ?? "").trim() : "";
+        if (!bank && !name) continue;
+        foundIdoDeps.push({
+          id: uid() + foundIdoDeps.length, bank,
+          acct: cAc >= 0 ? String(r[cAc] ?? "").trim() : "", name,
+          kind: cK >= 0 && String(r[cK] ?? "").trim() ? String(r[cK]).trim() : "예금",
+          amount: num(cA >= 0 ? r[cA] : 0), rate: cR >= 0 ? num(r[cR]) : 0,
+          start: cS >= 0 ? dstr(r[cS]) : "", end: cE2 >= 0 ? dstr(r[cE2]) : "",
+          memo: cM >= 0 ? String(r[cM] ?? "").trim() : "",
+          ...((() => { // 월별납입 "YYYY-MM:값;…" 복원
+            if (cP < 0) return {};
+            const t = String(r[cP] ?? "").trim();
+            if (!t) return {};
+            const pays = {};
+            t.split(";").forEach(p => { const mm2 = p.split(":"); if (/^\d{4}-\d{2}$/.test(mm2[0])) pays[mm2[0]] = Number(mm2[1]) || 0; });
+            return Object.keys(pays).length ? { pays } : {};
+          })())
+        });
+      }
+      continue;
+    }
     if (s.name.trim() === "여행내역") {
       const h = (s.rows[0] || []).map(x => String(x));
       const off = h.some(x => x.includes("여행ID")) ? 1 : 0; // 새 형식: A=여행ID
@@ -3236,7 +3316,7 @@ async function fileToEntries(nameOrFile, buf) {
     const monthly = foundFixed.filter(i => normFxPeriod(i.period || "월") === "월");
     if (monthly.length && monthly.every(i => i.pin === true)) monthly.forEach(i => delete i.pin);
   }
-  return { all, skipped, badSheets, budgets: foundBudgets, starts: foundStarts, fixed: foundFixed, tvTrips: foundTvTrips, tvItems: foundTvItems, stocks: foundStocks, savings: foundSavings, pension: foundPension, estates: foundEstates, loans: foundLoans, regionTx: foundRegionTx, regionCards: foundRegionCards, legacy: monthSheets.length > 0 };
+  return { all, skipped, badSheets, budgets: foundBudgets, starts: foundStarts, fixed: foundFixed, tvTrips: foundTvTrips, tvItems: foundTvItems, stocks: foundStocks, idoDeps: foundIdoDeps, savings: foundSavings, pension: foundPension, estates: foundEstates, loans: foundLoans, regionTx: foundRegionTx, regionCards: foundRegionCards, legacy: monthSheets.length > 0 };
 }
 
 /* ═══════════ 암호화 xlsx(여민전) 복호화 — ECMA-376 Agile, 순수 JS (SHA1+AES-128-CBC+CFB) ═══════════ */
@@ -4050,9 +4130,12 @@ function stkPrice(s) { const p = stockPrices && stockPrices.prices ? stockPrices
 function stkKrw(s, v) { if (v == null) return null; return s.market === "US" ? (stockPrices.usdkrw ? v * stockPrices.usdkrw : null) : v; }
 function renderStocks() {
   const fmt = (n) => Math.round(n).toLocaleString("ko-KR");
+  const ido = stockScope === "ido";
+  const scoped = stocks.filter(s => ido ? (s.who || "") === "이도" : (s.who || "") !== "이도"); // 데이터 분리: 이도계좌 ↔ 재테크
   const groups = {};
-  stocks.forEach(s => { const w = s.who || "기타"; (groups[w] = groups[w] || []).push(s); });
-  const order = ["쩡이", "슬구"].filter(w => groups[w]).concat(Object.keys(groups).filter(w => w !== "쩡이" && w !== "슬구"));
+  scoped.forEach(s => { const w = s.who || "기타"; (groups[w] = groups[w] || []).push(s); });
+  const order = (ido ? ["이도"] : ["쩡이", "슬구"]).filter(w => groups[w])
+    .concat(Object.keys(groups).filter(w => !(ido ? ["이도"] : ["쩡이", "슬구"]).includes(w)));
   const calc = (list) => { // 원화 환산 합계 (시세·환율 없는 종목은 집계 제외)
     let buy = 0, evalV = 0, counted = 0;
     list.forEach(s => {
@@ -4071,11 +4154,11 @@ function renderStocks() {
       <div class="value" style="color:${col}">${c.buy ? (profit >= 0 ? "+" : "") + fmt(profit) + "원 (" + (rate >= 0 ? "+" : "") + rate.toFixed(1) + "%)" : "-"}</div>
       <div style="font-size:11px;color:var(--muted);margin-top:2px">매입 ${fmt(c.buy)} → 평가 ${fmt(c.evalV)}</div></div>`;
   };
-  $("stkCards").innerHTML = stocks.length
-    ? order.map(w => cardHtml(w + " 주식", calc(groups[w]))).join("") + cardHtml("둘이 합산", calc(stocks))
+  $("stkCards").innerHTML = scoped.length
+    ? order.map(w => cardHtml(w + " 주식", calc(groups[w]))).join("") + (ido ? "" : cardHtml("둘이 합산", calc(scoped)))
     : "";
-  if (!stocks.length) {
-    $("stkBody").innerHTML = `<tr><td colspan="10"><div class="empty">보유 주식이 없습니다 — ＋ 추가로 종목·평단가·수량을 입력하세요</div></td></tr>`;
+  if (!scoped.length) {
+    $("stkBody").innerHTML = `<tr><td colspan="10"><div class="empty">${ido ? "이도 보유 주식이 없습니다" : "보유 주식이 없습니다"} — ＋ 추가로 종목·평단가·수량을 입력하세요</div></td></tr>`;
   } else {
     let html = "";
     order.forEach(w => {
@@ -4117,7 +4200,7 @@ function stkRowHtml(s) {
 }
 function stkEditorHtml(s) {
   return `<tr class="edit-row" data-sid="${s.id || ""}">
-    <td><select class="stk-who">${["쩡이", "슬구"].map(w => `<option${(s.who || "쩡이") === w ? " selected" : ""}>${w}</option>`).join("")}</select></td>
+    <td><select class="stk-who">${(stockScope === "ido" ? ["이도"] : ["쩡이", "슬구"]).map(w => `<option${(s.who || (stockScope === "ido" ? "이도" : "쩡이")) === w ? " selected" : ""}>${w}</option>`).join("")}</select></td>
     <td><input class="stk-name" value="${esc(s.name || "")}" placeholder="종목명" style="width:130px"></td>
     <td><div style="display:flex;gap:5px;align-items:center;min-width:0">
         <select class="stk-market" style="flex:0 0 74px"><option value="KR"${s.market !== "US" ? " selected" : ""}>한국</option><option value="US"${s.market === "US" ? " selected" : ""}>미국</option></select>
@@ -4224,7 +4307,7 @@ async function ghTriggerPrices() { // 종목이 바뀌면 시세 수집을 즉�
       if (++tries > 8) return;
       await ghLoadPrices().catch(() => {});
       if (stockPrices.updated !== prevUpd) {
-        if (mainMenu === "savings" && savingsView === "stock" && !$("stkBody").querySelector(".edit-row")) renderStocks(); // 편집 중이면 건너뜀
+        if (((mainMenu === "savings" && savingsView === "stock") || (mainMenu === "ido" && idoView === "stock")) && !$("stkBody").querySelector(".edit-row")) renderStocks(); // 편집 중이면 건너뜀
         toast("시세 반영 완료");
         return;
       }
@@ -4780,8 +4863,9 @@ function updateSavingsPh() {
   // 편집행이 열려 있으면 재렌더 건너뜀 — 입력 도중 백그라운드 재렌더로 입력칸이 사라지는 문제 방지
   const editing = (bodyId) => !!$(bodyId).querySelector(".edit-row");
   if (stock) {
+    stockScope = "fam";
     if (!editing("stkBody")) renderStocks();
-    if (ghActive()) ghLoadPrices().then(() => { if (savingsView === "stock" && !editing("stkBody")) renderStocks(); }).catch(() => {}); // 최신 시세 반영
+    if (ghActive()) ghLoadPrices().then(() => { if (mainMenu === "savings" && savingsView === "stock" && !editing("stkBody")) renderStocks(); }).catch(() => {}); // 최신 시세 반영
   } else if (deposit) { if (!editing("savBody")) renderSavings(); }
   else if (pen) {
     if (!editing("penBody")) renderPension();
@@ -4793,15 +4877,284 @@ function updateSavingsPh() {
 document.querySelectorAll("#savingsNav .side-item").forEach(b =>
   b.addEventListener("click", () => { savingsView = b.dataset.sv; updateSavingsPh(); }));
 
+/* ── 이도 예금 (예금/적금/예수금 · 은행/계좌번호) ── */
+function idoKindBadge(k) { return `<span class="badge ${k === "적금" ? "i" : "e"}" style="background:${k === "예수금" ? "#a16207" : ""}">${esc(k)}</span>`; }
+/* ── 적금 월별 납입 이력 ──
+   d.pays = {"YYYY-MM": 금액} — 그 달 실제 납입액 오버라이드 (0 = 안 넣음).
+   기록 없는 달은 기본 월납입액(d.amount) 으로 간주 → 정기적금은 이력 없이도 자동. */
+function idoMonths(d) { // 가입월 ~ 만기월(또는 미설정 시 이번 달+캡) 의 "YYYY-MM" 목록
+  if (!d.start) return [];
+  const out = [];
+  let y = +d.start.slice(0, 4), m = +d.start.slice(5, 7);
+  const endYm = (d.end || todayStr()).slice(0, 7);
+  for (let i = 0; i < 600; i++) {
+    const ym2 = y + "-" + String(m).padStart(2, "0");
+    out.push(ym2);
+    if (ym2 >= endYm) break;
+    m++; if (m > 12) { m = 1; y++; }
+  }
+  return out;
+}
+function idoPayAt(d, ym2) { // 그 달 납입액 (이력 우선, 없으면 기본)
+  if (d.pays && Object.prototype.hasOwnProperty.call(d.pays, ym2)) return d.pays[ym2] || 0;
+  return d.amount || 0;
+}
+/* 만기 예상이자(세전 단리): 예금=원금×r×기간(년), 적금=Σ(월납입×남은개월×r/12), 예수금=0 */
+function idoInterest(d) {
+  const r = (d.rate || 0) / 100;
+  if (!r || !d.start || !d.end || d.kind === "예수금") return 0;
+  if (d.kind === "적금") {
+    const ms = idoMonths(d);
+    const N2 = ms.length;
+    return ms.reduce((a, ym2, i) => a + idoPayAt(d, ym2) * (N2 - i) * (r / 12), 0);
+  }
+  const days = (new Date(d.end) - new Date(d.start)) / 86400000;
+  return days > 0 ? (d.amount || 0) * r * (days / 365) : 0;
+}
+/* 지금 해지 시 경과이자(약정이율 기준·세전) — 실제 중도해지이율은 은행별로 더 낮을 수 있음 */
+function idoInterestNow(d) {
+  const r = (d.rate || 0) / 100;
+  if (!r || !d.start || d.kind === "예수금") return 0;
+  const today = todayStr();
+  const endCap = d.end && d.end < today ? d.end : today; // 만기 지났으면 만기까지로 고정
+  if (d.kind === "적금") {
+    const nowYm = endCap.slice(0, 7);
+    const ms = idoMonths(d).filter(ym2 => ym2 <= nowYm);
+    const n2 = ms.length;
+    return ms.reduce((a, ym2, i) => a + idoPayAt(d, ym2) * (n2 - i) * (r / 12), 0);
+  }
+  const days = (new Date(endCap) - new Date(d.start)) / 86400000;
+  return days > 0 ? (d.amount || 0) * r * (days / 365) : 0;
+}
+/* 현재 잔액: 예금·예수금=금액 그대로, 적금=월별 납입(이력 반영) 누적 */
+function idoBalanceNow(d) {
+  if ((d.kind || "예금") !== "적금") return d.amount || 0;
+  if (!d.start) return 0;
+  const nowYm = todayStr().slice(0, 7);
+  return idoMonths(d).filter(ym2 => ym2 <= nowYm).reduce((a, ym2) => a + idoPayAt(d, ym2), 0);
+}
+function idoDepRowHtml(d) {
+  return `<tr data-did="${d.id}" title="더블클릭으로 수정">
+    <td style="font-weight:600">${esc(d.bank || "-")}</td>
+    <td class="cat-tag">${esc(d.acct || "-")}</td>
+    <td>${esc(d.name || "-")}</td>
+    <td>${idoKindBadge(d.kind || "예금")}</td>
+    <td class="amt">${(d.amount || 0).toLocaleString()}${d.kind === "적금" ? "<small style='color:var(--muted)'>/월</small>" : ""}</td>
+    <td class="amt">${d.rate ? d.rate + "%" : "-"}</td>
+    <td class="cat-tag">${d.start || "-"}</td>
+    <td class="cat-tag">${d.end || "-"}</td>
+    <td class="title-cell" title="${esc(d.memo || "")}">${esc(d.memo || "")}</td>
+    <td><div class="row-act">${(d.kind || "예금") === "적금" ? `<button class="pays" title="납입 이력 (달마다 다르게 넣은 금액)">📅</button>` : ""}<button class="edit" title="수정">✎</button><button class="del" title="삭제">🗑</button></div></td></tr>`;
+}
+/* 적금 납입 이력 편집 — 가입월~이번 달 그리드, 빈칸=기본 월납입, 0=안 넣음 */
+async function openIdoPays(d) {
+  const nowYm = todayStr().slice(0, 7);
+  const ms = idoMonths(d).filter(ym2 => ym2 <= nowYm);
+  if (!ms.length) { toast("가입일을 먼저 설정하세요"); return; }
+  const rows2 = ms.map(ym2 => {
+    const hasOv = d.pays && Object.prototype.hasOwnProperty.call(d.pays, ym2);
+    return `<label style="display:flex;gap:8px;align-items:center;padding:3px 2px;font-size:13px">
+      <span style="width:66px;color:var(--muted)">${ym2}</span>
+      <input class="pay-in" data-ym="${ym2}" value="${hasOv ? (d.pays[ym2] || 0).toLocaleString() : ""}"
+        placeholder="기본 ${(d.amount || 0).toLocaleString()}" style="flex:1;min-width:0;padding:5px 8px;border:1px solid var(--border);border-radius:7px;text-align:right;background:var(--card);color:var(--text)">
+      </label>`;
+  }).join("");
+  requestAnimationFrame(() => document.querySelectorAll(".pay-in").forEach(bindAmountInput)); // 모달이 뜨면 콤마 입력 바인딩
+  const ok = await dialog({ title: `${esc(d.bank || "")} ${esc(d.name || "적금")} — 납입 이력`,
+    msg: `<div style="max-height:46vh;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:6px 10px">${rows2}</div>
+      <div style="margin-top:8px;font-size:12px;color:var(--muted)">빈칸 = 기본 월납입 · <b>0</b> = 그달 안 넣음 · 다른 금액 = 그 값으로</div>`,
+    buttons: [{ label: "취소", value: false }, { label: "저장", value: true, primary: true }] });
+  if (!ok) return;
+  const pays = {};
+  document.querySelectorAll(".pay-in").forEach(inp => {
+    const v = inp.value.trim();
+    if (v === "") return; // 빈칸 = 기본값 (이력 제거)
+    pays[inp.dataset.ym] = Number(v.replace(/[,원\s]/g, "")) || 0;
+  });
+  if (Object.keys(pays).length) d.pays = pays; else delete d.pays;
+  save(); renderIdoDeps(); toast("납입 이력을 저장했어요");
+}
+function idoDepEditorHtml(d) {
+  const inp = (cls, v, ph, w) => `<input class="${cls}" value="${esc(v ?? "")}" placeholder="${ph}" style="width:${w}">`;
+  return `<tr class="edit-row" data-did="${d.id || ""}">
+    <td>${inp("ido-bank", d.bank, "은행/증권사", "76px")}</td>
+    <td>${inp("ido-acct", d.acct, "계좌번호", "110px")}</td>
+    <td>${inp("ido-name", d.name, "상품명", "110px")}</td>
+    <td><select class="ido-kind">${["예금", "적금", "예수금"].map(k => `<option${(d.kind || "예금") === k ? " selected" : ""}>${k}</option>`).join("")}</select></td>
+    <td>${inp("ido-amt", d.amount ? d.amount.toLocaleString() : "", "금액", "86px")}</td>
+    <td>${inp("ido-rate", d.rate || "", "%", "46px")}</td>
+    <td>${inp("ido-start", d.start, "260101", "74px")}</td>
+    <td>${inp("ido-end", d.end, "270101", "74px")}</td>
+    <td>${inp("ido-memo", d.memo, "메모", "90px")}</td>
+    <td><div class="er-act"><button class="er-save" title="저장">✓</button><button class="er-cancel" title="취소">✕</button></div></td></tr>`;
+}
+function bindIdoDepEditor(tr) {
+  const saveFn = () => {
+    const g = (c) => tr.querySelector("." + c).value.trim();
+    const bank = g("ido-bank"), name = g("ido-name");
+    if (!bank && !name) { toast("은행 또는 상품명을 입력하세요"); return; }
+    const amount = Number(g("ido-amt").replace(/[,원\s]/g, "")) || 0;
+    const yr = new Date().getFullYear();
+    const sd = g("ido-start") ? smartDate(g("ido-start"), yr) : "";
+    const ed = g("ido-end") ? smartDate(g("ido-end"), yr) : "";
+    if (g("ido-start") && !sd) { toast("가입일 형식을 확인하세요 (예: 260101)"); return; }
+    if (g("ido-end") && !ed) { toast("만기일 형식을 확인하세요"); return; }
+    const data = { bank, acct: g("ido-acct"), name, kind: tr.querySelector(".ido-kind").value,
+      amount, rate: Number(g("ido-rate").replace(/[%\s]/g, "")) || 0, start: sd || "", end: ed || "", memo: g("ido-memo") };
+    const id = tr.dataset.did;
+    if (id) { const d = idoDeposits.find(x => x.id === id); if (d) Object.assign(d, data); toast("수정했어요"); }
+    else { idoDeposits.push({ id: uid(), ...data }); toast("추가했어요"); }
+    save(); renderIdoDeps();
+  };
+  tr.querySelector(".er-save").addEventListener("click", saveFn);
+  tr.querySelector(".er-cancel").addEventListener("click", renderIdoDeps);
+  tr.querySelectorAll("input").forEach(i => i.addEventListener("keydown", (ev) => { if (ev.key === "Enter") saveFn(); if (ev.key === "Escape") renderIdoDeps(); }));
+  bindAmountInput(tr.querySelector(".ido-amt")); // 금액 콤마 자동 (다른 메뉴와 동일)
+  tr.querySelector(".ido-bank").focus();
+}
+function renderIdoDeps() {
+  const sum = (k) => idoDeposits.filter(d => (d.kind || "예금") === k).reduce((a, d) => a + (d.amount || 0), 0);
+  const intSum = idoDeposits.reduce((a, d) => a + idoInterest(d), 0);
+  $("idoDepCards").innerHTML = idoDeposits.length ? `
+    <div class="stat"><div class="label">예금</div><div class="value">${fmtWon(sum("예금"))}</div></div>
+    <div class="stat"><div class="label">적금 <span style="color:var(--muted);font-size:11px">월 ${fmtWon(sum("적금"))}</span></div><div class="value">${fmtWon(idoDeposits.filter(d => d.kind === "적금").reduce((a, d) => a + idoBalanceNow(d), 0))}<small style="font-size:11px;color:var(--muted)"> 납입 누적</small></div></div>
+    <div class="stat"><div class="label">예수금</div><div class="value">${fmtWon(sum("예수금"))}</div></div>
+    <div class="stat"><div class="label">만기 예상이자 (세전)</div><div class="value inc">+${fmtWon(Math.round(intSum))}</div></div>
+    <div class="stat"><div class="label">지금 해지 시 (약정이율)</div><div class="value" style="color:#a16207">+${fmtWon(Math.round(idoDeposits.reduce((a, d) => a + idoInterestNow(d), 0)))}</div></div>` : "";
+  if (!idoDeposits.length) {
+    $("idoDepBody").innerHTML = `<tr><td colspan="10"><div class="empty">이도 계좌가 없습니다 — ＋ 추가로 은행·계좌·금액을 입력하세요</div></td></tr>`;
+    return;
+  }
+  const order = { "예금": 0, "적금": 1, "예수금": 2 };
+  const list = idoDeposits.slice().sort((a, b) => (order[a.kind] ?? 9) - (order[b.kind] ?? 9) || (a.bank || "").localeCompare(b.bank || ""));
+  $("idoDepBody").innerHTML = list.map(idoDepRowHtml).join("");
+  $("idoDepBody").querySelectorAll("tr[data-did]").forEach(tr => {
+    const id = tr.dataset.did;
+    const openEdit = () => {
+      if ($("idoDepBody").querySelector(".edit-row")) renderIdoDeps();
+      const d = idoDeposits.find(x => x.id === id);
+      const temp = document.createElement("tbody");
+      temp.innerHTML = idoDepEditorHtml(d);
+      $("idoDepBody").querySelector(`tr[data-did="${id}"]`).replaceWith(temp.firstElementChild);
+      bindIdoDepEditor($("idoDepBody").querySelector(".edit-row"));
+    };
+    tr.querySelector(".edit")?.addEventListener("click", openEdit);
+    tr.querySelector(".pays")?.addEventListener("click", () => { const d = idoDeposits.find(x => x.id === id); if (d) openIdoPays(d); });
+    tr.addEventListener("dblclick", (ev) => { if (!ev.target.closest(".row-act")) openEdit(); });
+    tr.querySelector(".del")?.addEventListener("click", async () => {
+      const d = idoDeposits.find(x => x.id === id);
+      if (!await uiConfirm(`<b>${esc(d.bank || "")} ${esc(d.name || "")}</b> 계좌를 삭제할까요?`, { title: "계좌 삭제", ok: "삭제" })) return;
+      idoDeposits = idoDeposits.filter(x => x.id !== id);
+      save(); renderIdoDeps(); toast("삭제했어요");
+    });
+  });
+}
+/* 이도 통계: 예·적금 이자 + 주식 손익 + 총자산 */
+function renderIdoStats() {
+  const fmt = (n) => Math.round(n).toLocaleString("ko-KR");
+  const dep = idoDeposits.filter(d => (d.kind || "예금") !== "예수금").reduce((a, d) => a + (d.amount || 0), 0);
+  const cashD = idoDeposits.filter(d => d.kind === "예수금").reduce((a, d) => a + (d.amount || 0), 0);
+  const intSum = idoDeposits.reduce((a, d) => a + idoInterest(d), 0);
+  const idoStk = stocks.filter(s => (s.who || "") === "이도");
+  let buy = 0, evalV = 0, counted = 0;
+  idoStk.forEach(s => {
+    const p = stkPrice(s);
+    const b = stkKrw(s, s.avg * s.qty);
+    const ev = p != null ? stkKrw(s, p * s.qty) : null;
+    if (b != null && ev != null) { buy += b; evalV += ev; counted++; }
+  });
+  const profit = evalV - buy;
+  const pCol = profit >= 0 ? "var(--exp)" : "var(--accent)";
+  const total = idoDeposits.reduce((a, d) => a + idoBalanceNow(d), 0) + evalV; // 총자산: 예금+예수금+적금 납입누적+주식평가
+  $("idoStatCards").innerHTML = `
+    <div class="stat"><div class="label">총자산 <span style="color:var(--muted);font-size:11px">예금+예수금+적금누적+주식평가</span></div><div class="value">${fmtWon(Math.round(total))}</div></div>
+    <div class="stat"><div class="label">예·적금 만기 예상이자 (세전)</div><div class="value inc">+${fmtWon(Math.round(intSum))}</div></div>
+    <div class="stat"><div class="label">지금 해지 시 (약정이율)</div><div class="value" style="color:#a16207">+${fmtWon(Math.round(idoDeposits.reduce((a, d) => a + idoInterestNow(d), 0)))}</div></div>
+    <div class="stat"><div class="label">주식 손익${counted < idoStk.length ? ` <span style="color:var(--muted);font-size:11px">(시세 ${counted}/${idoStk.length})</span>` : ""}</div>
+      <div class="value" style="color:${pCol}">${buy ? (profit >= 0 ? "+" : "") + fmt(profit) + "원 (" + (buy ? ((profit / buy * 100).toFixed(1)) : 0) + "%)" : "-"}</div></div>`;
+  const rows = idoDeposits.filter(d => d.kind !== "예수금").map(d => {
+    const it = idoInterest(d);
+    const nowBal = idoBalanceNow(d);
+    const base = d.kind === "적금" && d.start && d.end
+      ? (d.amount || 0) * Math.max(1, Math.round((new Date(d.end) - new Date(d.start)) / 86400000 / 30.44))
+      : (d.amount || 0);
+    return `<div style="display:flex;justify-content:space-between;padding:6px 2px;border-bottom:1px solid var(--border);font-size:13px">
+      <span>${esc(d.bank || "")} ${esc(d.name || "")} ${idoKindBadge(d.kind || "예금")} <span style="color:var(--muted)">${d.rate || 0}% · ${d.end ? "만기 " + d.end : "기간 미설정"}</span></span>
+      <b>${d.kind === "적금" ? `누적 ${fmt(nowBal)} / 만기 ${fmt(base)}원` : fmt(base) + "원"} ${it ? `<span style="color:var(--inc)">만기 +${fmt(it)}</span>` : ""}${idoInterestNow(d) ? ` <span style="color:#a16207">· 지금 +${fmt(idoInterestNow(d))}</span>` : ""}</b></div>`;
+  }).join("");
+  $("idoStatBody").innerHTML = rows || `<div class="empty" style="padding:8px 0">예·적금 계좌를 등록하면 만기 예상이 나와요</div>`;
+
+  // ── 차트 (가계부 통계와 동일한 도넛·막대 패턴, 검증 팔레트 DONUT_COLORS 고정 순서) ──
+  // 자산 구성 도넛: 예금 / 적금 납입누적 / 예수금 / 주식 평가 — 항목 순서 고정 (랭크로 색이 바뀌지 않게)
+  const comp = [
+    ["예금", idoDeposits.filter(d => (d.kind || "예금") === "예금").reduce((a, d) => a + (d.amount || 0), 0)],
+    ["적금 누적", idoDeposits.filter(d => d.kind === "적금").reduce((a, d) => a + idoBalanceNow(d), 0)],
+    ["예수금", idoDeposits.filter(d => d.kind === "예수금").reduce((a, d) => a + (d.amount || 0), 0)],
+    ["주식 평가", Math.round(evalV)]
+  ]; // 0원 항목도 자리 유지 — 네 항목의 색이 항상 같게 (엔티티-색 고정)
+  const hasAny = comp.some(x => x[1] > 0);
+  $("idoAssetSub").innerHTML = hasAny ? `총 ${emAmt(fmtWon(Math.round(total)))}` : "";
+  if (hasAny) renderDonut(comp, "idoAssetDonut", 220);
+  else $("idoAssetDonut").innerHTML = `<div class="empty" style="padding:14px 0">계좌·주식을 등록하면 구성이 나와요</div>`;
+
+  // 계좌·종목별 가로 막대: 현재 가치 기준 내림차순 (가계부 분포 막대와 동일 스펙)
+  const barItems = [
+    ...idoDeposits.map(d => [`${d.bank || ""} ${d.name || d.kind || ""}`.trim() || "(계좌)", Math.round(idoBalanceNow(d))]),
+    ...idoStk.map(s => { const p = stkPrice(s); return [s.name || s.code, p != null ? Math.round(stkKrw(s, p * s.qty) || 0) : Math.round(stkKrw(s, s.avg * s.qty) || 0)]; })
+  ].filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]);
+  const bAll = barItems.length;
+  const barTop = barItems.slice(0, 10);
+  const bTot = barItems.reduce((a, x) => a + x[1], 0);
+  $("idoBarSub").innerHTML = bAll > 10 ? `상위 10 / 전체 ${bAll}개` : "";
+  if (barTop.length) {
+    const mx = barTop[0][1];
+    $("idoBars").innerHTML = barTop.map(([nm, amt], i) =>
+      `<div class="bar-row" data-tip="<b>${esc(nm)}</b><br>${fmtWon(amt)} · ${(amt / bTot * 100).toFixed(0)}%">
+        <div class="bar-label">${esc(nm)}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(amt / mx * 100).toFixed(1)}%;background:${DONUT_COLORS[i % DONUT_COLORS.length]}"></div>
+        <span class="bar-val">${amt.toLocaleString()}</span></div></div>`).join("");
+    bindHoverTips($("idoBars"));
+  } else {
+    $("idoBars").innerHTML = `<div class="empty" style="padding:14px 0">표시할 금액이 없어요</div>`;
+  }
+}
 /* 이도계좌현황 메뉴의 사이드바 (예금/주식) */
 const IDO_NAMES = { deposit: "예금", stock: "주식", stats: "통계" };
 let idoView = "deposit";
 function updateIdoPh() {
   document.querySelectorAll("#idoNav .side-item").forEach(x => x.classList.toggle("active", x.dataset.iv === idoView));
-  $("phTitle").textContent = `이도계좌현황 — ${IDO_NAMES[idoView]}`;
+  const stock = idoView === "stock";
+  const dep = idoView === "deposit";
+  const stats = idoView === "stats";
+  $("stockView").classList.toggle("hidden", !stock); // 재테크와 같은 화면·기능, 데이터는 이도 것만 (stockScope)
+  $("idoDepView").classList.toggle("hidden", !dep);
+  $("idoStatsView").classList.toggle("hidden", !stats);
+  $("sectionPlaceholder").classList.toggle("hidden", stock || dep || stats);
+  if (stock) {
+    stockScope = "ido";
+    if (!$("stkBody").querySelector(".edit-row")) renderStocks();
+    if (ghActive()) ghLoadPrices().then(() => { if (mainMenu === "ido" && idoView === "stock" && !$("stkBody").querySelector(".edit-row")) renderStocks(); }).catch(() => {});
+  } else if (dep) {
+    if (!$("idoDepBody").querySelector(".edit-row")) renderIdoDeps();
+  } else if (stats) {
+    renderIdoStats();
+    if (ghActive()) ghLoadPrices().then(() => { if (mainMenu === "ido" && idoView === "stats") renderIdoStats(); }).catch(() => {});
+  } else {
+    $("phTitle").textContent = `이도계좌현황 — ${IDO_NAMES[idoView]}`;
+  }
 }
 document.querySelectorAll("#idoNav .side-item").forEach(b =>
-  b.addEventListener("click", () => { idoView = b.dataset.iv; updateIdoPh(); }));
+  b.addEventListener("click", () => { idoView = b.dataset.iv; updateIdoPh(); if (typeof saveUiState === "function") saveUiState(); }));
+$("idoDepAddBtn").addEventListener("click", () => {
+  if (!httpMode && !ghActive() && fsMode && !fileHandle) { toast("파일 연결 중이에요 — 잠시 후 다시 시도해주세요"); return; }
+  if ($("idoDepBody").querySelector(".edit-row")) return;
+  const emp = $("idoDepBody").querySelector(".empty");
+  if (emp) emp.closest("tr").remove();
+  const temp = document.createElement("tbody");
+  temp.innerHTML = idoDepEditorHtml({});
+  $("idoDepBody").prepend(temp.firstElementChild);
+  bindIdoDepEditor($("idoDepBody").querySelector(".edit-row"));
+});
 
 /* ═══════════ 여행기록 ═══════════ */
 let travelView = "calendar";
@@ -5940,7 +6293,8 @@ document.addEventListener("keydown", (e) => {
     tvAddTripForRange(sel ? sel[0] : null, sel ? sel[1] : null);
     return;
   }
-  if (mainMenu === "savings" && savingsView === "stock") { e.preventDefault(); $("stkAddBtn").click(); return; }
+  if ((mainMenu === "savings" && savingsView === "stock") || (mainMenu === "ido" && idoView === "stock")) { e.preventDefault(); $("stkAddBtn").click(); return; }
+  if (mainMenu === "ido" && idoView === "deposit") { e.preventDefault(); $("idoDepAddBtn").click(); return; }
   if (mainMenu === "savings" && savingsView === "deposit") { e.preventDefault(); $("savAddBtn").click(); return; }
   if (mainMenu === "savings" && savingsView === "pension") { e.preventDefault(); $("penAddBtn").click(); return; }
   if (mainMenu === "savings" && savingsView === "estate") { e.preventDefault(); $("estAddBtn").click(); return; }
@@ -6163,7 +6517,7 @@ document.querySelectorAll("#mainMenu .nav-item").forEach(b =>
     const travel = mainMenu === "travel";
     $("ledgerSection").classList.toggle("hidden", !ledger);
     $("travelSection").classList.toggle("hidden", !travel);
-    ["stockView", "savingsView", "pensionView", "estateView", "loanView"].forEach(v => $(v).classList.add("hidden")); // 재테크면 updateSavingsPh가 다시 연다
+    ["stockView", "savingsView", "pensionView", "estateView", "loanView", "idoDepView", "idoStatsView"].forEach(v => $(v).classList.add("hidden")); // 재테크면 updateSavingsPh가 다시 연다
     $("sectionPlaceholder").classList.toggle("hidden", ledger || travel);
     $("sideNav").classList.toggle("hidden", !ledger);
     $("savingsNav").classList.toggle("hidden", !savings);
@@ -6312,7 +6666,7 @@ async function loadFromHandle() {
   dbLastMod = f.lastModified;
   viewOnly = false;
   if (f.size > 0) {
-    const { all, badSheets, legacy, budgets: b, starts, fixed, tvTrips, tvItems, stocks: stk, savings: sav, pension: pen, estates: est, loans: lo, regionTx: rtx, regionCards: rc } = await fileToEntries(fileHandle.name, await f.arrayBuffer());
+    const { all, badSheets, legacy, budgets: b, starts, fixed, tvTrips, tvItems, stocks: stk, savings: sav, pension: pen, estates: est, loans: lo, regionTx: rtx, regionCards: rc, idoDeps: idoD } = await fileToEntries(fileHandle.name, await f.arrayBuffer());
     entries = all;
     budgets = b || {};
     monthStarts = starts || {};
@@ -6325,6 +6679,7 @@ async function loadFromHandle() {
     estates = est || [];
     loans = lo || [];
     regionTx = rtx || [];
+    idoDeposits = idoD || [];
     if (rc && rc.length) regionCards = rc;
     initUndoBaseline();
     if (legacy) {
@@ -6342,7 +6697,7 @@ async function loadFromHandle() {
   const latest = entries.reduce((a, e) => e.date > a ? e.date : a, "");
   if (latest) curMonth = new Date(+latest.slice(0, 4), +latest.slice(5, 7) - 1, 1);
   if (!viewOnly) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx, rc: regionCards })); } catch (e) {}
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: entries, budgets: budgets, fixed: fixedItems, starts: monthStarts, tvT: travelTrips, tvI: travelItems, stk: stocks, sav: savings, pen: pension, est: estates, loan: loans, rtx: regionTx, rc: regionCards, idoD: idoDeposits })); } catch (e) {}
   }
   fileState(viewOnly
     ? `👁 ${fileHandle.name} · ${entries.length}건 · 보기 전용`
@@ -6446,7 +6801,7 @@ async function initApp() {
       const c = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
       if (c.entries && c.entries.length) {
         entries = c.entries; budgets = c.budgets || {}; fixedItems = c.fixed || [];
-        monthStarts = c.starts || {}; travelTrips = c.tvT || []; travelItems = c.tvI || []; stocks = c.stk || []; savings = c.sav || []; pension = c.pen || []; estates = c.est || []; loans = c.loan || []; regionTx = c.rtx || []; if (c.rc) regionCards = c.rc;
+        monthStarts = c.starts || {}; travelTrips = c.tvT || []; travelItems = c.tvI || []; stocks = c.stk || []; savings = c.sav || []; pension = c.pen || []; estates = c.est || []; loans = c.loan || []; regionTx = c.rtx || []; idoDeposits = c.idoD || []; if (c.rc) regionCards = c.rc;
         hasCache = true;
         const latest = entries.reduce((a, e) => e.date > a ? e.date : a, "");
         if (latest) curMonth = new Date(+latest.slice(0, 4), +latest.slice(5, 7) - 1, 1);
@@ -6524,7 +6879,7 @@ async function initApp() {
           monthStarts = c.starts || {};
           travelTrips = c.tvT || [];
           travelItems = c.tvI || [];
-          stocks = c.stk || []; savings = c.sav || []; pension = c.pen || []; estates = c.est || []; loans = c.loan || []; regionTx = c.rtx || []; if (c.rc) regionCards = c.rc;
+          stocks = c.stk || []; savings = c.sav || []; pension = c.pen || []; estates = c.est || []; loans = c.loan || []; regionTx = c.rtx || []; idoDeposits = c.idoD || []; if (c.rc) regionCards = c.rc;
         } catch (e2) { entries = []; budgets = {}; }
         const latest = entries.reduce((a, e) => e.date > a ? e.date : a, "");
         if (latest) curMonth = new Date(+latest.slice(0, 4), +latest.slice(5, 7) - 1, 1);
