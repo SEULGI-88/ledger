@@ -235,6 +235,8 @@
   .row-act button.del { color:var(--exp); }
   .row-act button.del:hover { background:var(--exp-soft); }
   .row-act button.pin { filter:grayscale(1); opacity:.45; }
+  .row-act button.tripbtn { filter:grayscale(1); opacity:.45; }
+  .row-act button.tripbtn.on { visibility:visible; filter:none; opacity:1; color:#2563eb; } /* 연결된 행은 호버 없이도 ✈ 표시 */
   .row-act button.pin.on { visibility:visible; filter:none; opacity:1; } /* 고정된 행은 호버 없이도 📌 표시 */
   .day-sep td { background:var(--card-2) !important; color:var(--muted); font-size:11px; padding:4px 14px; }
   .table-scroll { max-height:60vh; overflow:auto; border-radius:16px; }
@@ -1215,7 +1217,7 @@ function buildXlsx() {
       S("C1", "입금 합계", 3) + F("D1", 'SUMIF(B5:B2000,"입금",F5:F2000)', 2) +
       S("E1", "지출 합계", 3) + F("F1", 'SUMIF(B5:B2000,"지출",F5:F2000)', 2) + `</row>`;
     body += `<row r="2">` + S("A2", "남은 금액", 3) + F("B2", "B1-F1", 2) + `</row>`;
-    body += `<row r="4">` + ["날짜", "구분", "멤버", "카테고리", "내용", "금액", "정산", "키"].map((h, ci) => S(colLetter(ci) + "4", h, 3)).join("") + `</row>`;
+    body += `<row r="4">` + ["날짜", "구분", "멤버", "카테고리", "내용", "금액", "정산", "키", "여행"].map((h, ci) => S(colLetter(ci) + "4", h, 3)).join("") + `</row>`;
     list.forEach((e, ri) => {
       const r = ri + 5;
       body += `<row r="${r}">` +
@@ -1226,7 +1228,8 @@ function buildXlsx() {
         S("E" + r, e.title) +
         N("F" + r, e.amount, 2) +
         (e.settled ? S("G" + r, "완료") : "") +
-        (e.ik ? S("H" + r, e.ik) : "") + `</row>`;
+        (e.ik ? S("H" + r, e.ik) : "") +
+        (e.trip ? S("I" + r, e.trip) : "") + `</row>`;
     });
     const xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
       `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
@@ -1770,6 +1773,7 @@ function rowHtml(e, withDate = true, withCheck = false) {
       ? `<td class="chk-col"><input type="checkbox" class="rowchk" ${e.settled ? "checked" : ""} title="정산완료"> <span class="chk-lb">${e.settled ? "완료" : "미완료"}</span></td>`
       : `<td class="chk-col"></td>`) : ""}
     <td><div class="row-act">
+      <button class="tripbtn${e.trip ? " on" : ""}" title="${e.trip ? `여행 연결: ${esc(tripLabel(travelTrips.find(t => t.id === e.trip) || { name: "?" }))} — 클릭해서 변경/해제` : "여행에 연결"}">✈</button>
       <button class="edit" title="수정">✎</button>
       <button class="del" title="삭제">🗑</button>
     </div></td></tr>`;
@@ -1833,21 +1837,16 @@ async function selDelete() {
   selRows.clear();
   save(); render(); toast(`${ids.length}건 삭제했어요`);
 }
-/* 선택한 생활비 항목을 여행 내역으로 이동 (entries → travelItems) */
+/* 선택한 생활비 항목을 여행에 '연결' — 생활비에 그대로 남고(정산도 가계부), 여행 화면에 함께 보임 */
 function moveEntriesToTrip(ids, tripId, tripName) {
   const set = new Set(ids);
-  const moving = entries.filter(e => set.has(e.id));
-  if (!moving.length) return;
-  moving.forEach(e => travelItems.push({
-    id: uid(), trip: tripId, date: e.date,
-    title: e.title || e.cat || "", amount: Math.abs(e.amount) || 0,
-    memo: [e.who, e.cat].filter(Boolean).join(" · ") // 멤버·카테고리는 메모로 보존
-  }));
-  entries = entries.filter(e => !set.has(e.id));
+  let n = 0;
+  entries.forEach(e => { if (set.has(e.id)) { e.trip = tripId; n++; } });
+  if (!n) return;
   selRows.clear();
-  save(); render(); toast(`${tripName ? esc(tripName) + "(으)로 " : "여행으로 "}${moving.length}건 옮겼어요`);
+  save(); render(); toast(`${tripName ? esc(tripName) + "에 " : "여행에 "}${n}건 연결했어요 — 생활비엔 그대로 있어요`);
 }
-/* 선택 우클릭 → "여행으로 이동" 서브메뉴 (기존 여행 / 새 여행) */
+/* 선택 우클릭 → "여행에 연결" 서브메뉴 (기존 여행 / 새 여행 / 연결 해제) */
 function openTripMoveMenu(ids, x, y) {
   const trips = travelTrips.slice().sort((a, b) => {
     const ra = tripRange(a), rb = tripRange(b);
@@ -1857,6 +1856,14 @@ function openTripMoveMenu(ids, x, y) {
   if (trips.length) {
     items.push({ sep: true });
     trips.forEach(t => items.push({ label: `${t.name} · ${fmtRange(tripRange(t))}`, onClick: () => moveEntriesToTrip(ids, t.id, t.name) }));
+  }
+  const linked = entries.filter(e => ids.includes(e.id) && e.trip);
+  if (linked.length) {
+    items.push({ sep: true });
+    items.push({ label: `✕ 여행 연결 해제 (${linked.length}건)`, danger: true, onClick: () => {
+      linked.forEach(e => delete e.trip);
+      save(); render(); toast(`${linked.length}건 연결을 해제했어요`);
+    } });
   }
   showCtxMenu(x, y, items);
 }
@@ -1922,7 +1929,7 @@ async function newTripFromSelection(ids) {
       items.push({ sep: true });
     }
     const mx = e.clientX, my = e.clientY;
-    items.push({ label: "🧳 여행으로 이동", onClick: () => openTripMoveMenu(ids, mx, my) });
+    items.push({ label: "🧳 여행에 연결", onClick: () => openTripMoveMenu(ids, mx, my) });
     items.push({ sep: true });
     items.push({ label: "🗑 삭제", danger: true, onClick: selDelete });
     items.push({ sep: true });
@@ -2078,6 +2085,8 @@ function bindEditorRow(tr) {
       toast("수정했어요");
     } else {
       entries.push({ id: uid(), seq: ++seqGen, date: date, ...data });
+      const ne = entries[entries.length - 1];
+      if (ne.type === "exp" && !ne.trip) { const tc = tripsCovering(ne.date); if (tc.length === 1) ne.trip = tc[0].id; } // 여행 기간 내 지출 자동 연결
       toast(`${data.type === "exp" ? "지출" : "입금"} ${fmtWon(amount)} 추가`);
     }
     save();
@@ -2094,6 +2103,10 @@ function bindEditorRow(tr) {
 function bindRowActions(root) {
   root.querySelectorAll("tr[data-id]").forEach(tr => {
     const id = tr.dataset.id;
+    tr.querySelector(".tripbtn")?.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      openTripMoveMenu([id], ev.clientX, ev.clientY);
+    });
     tr.querySelector(".del")?.addEventListener("click", () => {
       if (!httpMode && !ghActive() && fsMode && !fileHandle) { toast("파일 연결 중이에요 — 잠시 후 다시 시도해주세요"); return; }
       entries = entries.filter(e => e.id !== id);
@@ -2682,6 +2695,7 @@ function submitEntry() {
     toast("수정했어요");
   } else {
     entries.push({ id: uid(), seq: ++seqGen, ...data });
+    { const ne = entries[entries.length - 1]; if (ne.type === "exp" && !ne.trip && ne.date) { const tc = tripsCovering(ne.date); if (tc.length === 1) ne.trip = tc[0].id; } } // 여행 기간 내 지출 자동 연결
     toast(`${data.type === "exp" ? "지출" : "입금"} ${fmtWon(amount)} 추가`);
   }
   save();
@@ -2878,7 +2892,7 @@ function cellToDate(v, ctx) {
 /* 시트 rows → 가계부 entries. 헤더 행을 상위 10행에서 탐색 (요약 행 건너뜀) */
 function rowsToEntries(rows, ctx) {
   if (rows.length < 2) return { list: [], skipped: 0 };
-  let headerIdx = -1, cDate = -1, cAmt = -1, cType = -1, cCat = -1, cWho = -1, cTitle = -1, cSettled = -1, cKey = -1;
+  let headerIdx = -1, cDate = -1, cAmt = -1, cType = -1, cCat = -1, cWho = -1, cTitle = -1, cSettled = -1, cKey = -1, cTrip = -1;
   for (let i = 0; i < Math.min(rows.length, 10); i++) {
     const h = rows[i].map(String);
     const d = findCol(h, ["날짜", "일자", "date", "거래일"]);
@@ -2891,6 +2905,7 @@ function rowsToEntries(rows, ctx) {
       cWho = findCol(h, ["멤버", "누구", "사람", "결제자", "입금자", "대분류"]);
       cTitle = findCol(h, ["내용", "내역", "사용처", "적요", "title", "가맹점"]);
       cKey = findCol(h, ["키", "가져오기키", "importkey"]);
+      cTrip = findCol(h, ["여행", "trip", "여행id"]);
       break;
     }
   }
@@ -2913,7 +2928,8 @@ function rowsToEntries(rows, ctx) {
       title: cTitle >= 0 ? String(r[cTitle]).trim() : "",
       amount: cType >= 0 ? Math.round(amt) : Math.abs(Math.round(amt)), // 구분 열이 있으면 음수(환불·차감)도 그대로 보존
       settled: cSettled >= 0 && /완료/.test(String(r[cSettled] || "")),
-      ...(cKey >= 0 && String(r[cKey] || "").trim() ? { ik: String(r[cKey]).trim() } : {}) // 카드 가져오기 중복키
+      ...(cKey >= 0 && String(r[cKey] || "").trim() ? { ik: String(r[cKey]).trim() } : {}), // 카드 가져오기 중복키
+      ...(cTrip >= 0 && String(r[cTrip] || "").trim() ? { trip: String(r[cTrip]).trim() } : {}) // 여행 연결(여행 id)
     });
   }
   return { list, skipped };
@@ -4827,6 +4843,26 @@ function tripRange(t) { // 기간: 직접 설정 우선, 없으면 내역 날짜
   return t.start ? [t.start, t.end || t.start] : null;
 }
 function tripSum(id) { return travelItems.filter(i => i.trip === id).reduce((a, i) => a + (i.amount || 0), 0); }
+/* 생활비에서 여행에 '연결'된 항목 (원본은 가계부, 정산도 가계부에서) — 입금(경비 입금·환급)도 연결 가능 */
+function tripLinkedEntries(id) { return entries.filter(e => e.trip === id && e.type === "exp"); }
+function tripLinkedInc(id) { return entries.filter(e => e.trip === id && e.type === "inc"); }
+function tripLinkedSum(id) { return tripLinkedEntries(id).reduce((a, e) => a + (e.amount || 0), 0); }
+function tripTotal(id) { return tripSum(id) + tripLinkedSum(id); } // 여행내역 + 연결 생활비 합계
+function tripsCovering(date) { return travelTrips.filter(t => { const r = tripRange(t); return r && r[0] <= date && r[1] >= date; }); }
+/* 여행 생성·기간 수정 후: 기간 내 미연결 생활비 지출을 소급 연결할지 제안 */
+async function offerLinkEntries(t) {
+  const r = tripRange(t);
+  if (!r) return;
+  const cands = entries.filter(e => e.type === "exp" && !e.trip && e.date >= r[0] && e.date <= r[1]);
+  if (!cands.length) return;
+  const sum = cands.reduce((a, e) => a + e.amount, 0);
+  if (await uiConfirm(`이 기간 생활비 지출 <b>${cands.length}건 · ${fmtWon(sum)}</b>이 있어요.<br><b>${esc(t.name)}</b>에 연결할까요? (생활비에 그대로 남고, 정산도 가계부에서)`, { title: "생활비 연결", ok: "연결" })) {
+    cands.forEach(e => e.trip = t.id);
+    save();
+    renderTravel();
+    toast(`${cands.length}건 연결했어요`);
+  }
+}
 let tvYearFilter = String(new Date().getFullYear()); // 기본 = 올해 ("" = 전체 기간)
 function tripInYear(t, y) {
   if (!y) return true;
@@ -5200,11 +5236,13 @@ function bindTvBands() {
           const mm2 = String(v).match(/(\d{4}-\d{2}-\d{2})\s*~\s*(\d{4}-\d{2}-\d{2})/);
           if (!mm2) { toast("형식: 2026-08-01 ~ 2026-08-03"); return; }
           t.start = mm2[1]; t.end = mm2[2]; save(); renderTravel(); toast("기간을 수정했어요");
+          await offerLinkEntries(t);
         } },
         { label: `🗑 삭제 · ${t.name}`, danger: true, onClick: async () => {
           if (!await uiConfirm(`<b>${esc(t.name)}</b> 여행과 내역 전체를 삭제할까요?`, { title: "여행 삭제", ok: "삭제" })) return;
           travelTrips = travelTrips.filter(x => x.id !== t.id);
           travelItems = travelItems.filter(i => i.trip !== t.id);
+          entries.forEach(e2 => { if (e2.trip === t.id) delete e2.trip; }); // 연결 해제 (생활비 항목은 유지)
           if (tvSelected === t.id) tvSelected = null;
           save(); renderTravel(); toast("삭제했어요");
         } }
@@ -5548,7 +5586,7 @@ $("tvTodayBtn").addEventListener("click", () => { tvMonth = new Date(new Date().
 let tvTripUnchecked = new Set(); // 합계에서 제외한 여행들
 function updateTvListCards(trips) {
   const sel = trips.filter(t => !tvTripUnchecked.has(t.id));
-  const sum = sel.reduce((a, t) => a + tripSum(t.id), 0);
+  const sum = sel.reduce((a, t) => a + tripTotal(t.id), 0);
   $("tvListCards").innerHTML = `
     <div class="stat"><div class="label">선택한 여행 지출 합계</div><div class="value exp">${fmtWon(sum)}</div></div>
     <div class="stat"><div class="label">합산 중인 여행</div><div class="value" style="font-size:16px">${sel.length} / ${trips.length}개</div></div>`;
@@ -5563,11 +5601,11 @@ function renderTravelList() {
     return;
   }
   $("tvTripBody").innerHTML = trips.map(t => {
-    const cnt = travelItems.filter(x => x.trip === t.id).length;
+    const cnt = travelItems.filter(x => x.trip === t.id).length + tripLinkedEntries(t.id).length;
     return `<tr data-trip="${t.id}" style="cursor:pointer">
       <td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${tripColor(t.id)};margin-right:7px"></span><b>${esc(t.name)}</b></td>
       <td class="cat-tag">${fmtRange(tripRange(t))}</td>
-      <td class="amt e">${tripSum(t.id).toLocaleString()}</td>
+      <td class="amt e">${tripTotal(t.id).toLocaleString()}</td>
       <td class="chk-col"><input type="checkbox" class="tvt-chk" ${tvTripUnchecked.has(t.id) ? "" : "checked"} title="합계에 포함"></td>
       <td class="amt">${cnt}건</td>
       <td><div class="row-act"><button class="del" title="여행 삭제">🗑</button></div></td></tr>`;
@@ -5586,6 +5624,7 @@ function renderTravelList() {
       if (!await uiConfirm(`<b>${esc(t.name)}</b> (${fmtRange(tripRange(t))}) 여행과 내역 전체를 삭제할까요?`, { title: "여행 삭제", ok: "삭제" })) return;
       travelTrips = travelTrips.filter(x => x.id !== tid);
       travelItems = travelItems.filter(i => i.trip !== tid);
+      entries.forEach(e2 => { if (e2.trip === tid) delete e2.trip; }); // 연결 해제 (생활비 항목은 유지)
       if (tvSelected === tid) tvSelected = null;
       save();
       renderTravelList();
@@ -5599,16 +5638,65 @@ function renderTravelDetail() {
   if (!t || !tripInYear(t, tvYearFilter)) { d.classList.add("hidden"); return; }
   const items = travelItems.filter(x => x.trip === tvSelected);
   let html = `<h3><b style="color:${tripColor(tvSelected)}">${esc(t.name)}</b>
-    <span class="cat-tag">${fmtRange(tripRange(t))}</span> · 지출 ${fmtWon(tripSum(tvSelected))}
+    <span class="cat-tag">${fmtRange(tripRange(t))}</span> · 지출 ${fmtWon(tripTotal(tvSelected))}${tripLinkedInc(tvSelected).length ? ` · <span style="color:var(--inc)">경비 입금 +${fmtWon(tripLinkedInc(tvSelected).reduce((a, e) => a + e.amount, 0))}</span>` : ""}
     <button class="btn" id="tvRangeBtn" style="margin-left:auto;padding:4px 11px">기간 설정</button>
     <button class="add-btn" id="tvAddItemBtn" style="padding:4px 12px">＋ 내역</button></h3>
     <table class="ledger-table"><tbody id="tvItemBody">`;
   items.forEach(it => { html += tvItemRow(it); });
   html += "</tbody></table>";
   if (!items.length) html += `<div class="empty" style="padding:10px 0">내역이 없습니다 — ＋ 내역을 눌러 입력하세요</div>`;
+  // 생활비 연결 섹션 — 원본은 가계부(정산도 가계부에서), 여기선 보기·해제·가져오기만
+  const lkExp = tripLinkedEntries(tvSelected).slice().sort((a, b) => a.date.localeCompare(b.date));
+  const lkInc = tripLinkedInc(tvSelected).slice().sort((a, b) => a.date.localeCompare(b.date));
+  const lk = [...lkInc, ...lkExp];
+  html += `<h3 style="margin-top:16px">생활비 연결 <span class="cat-tag">${lk.length}건</span>${lkExp.length ? ` · 지출 ${fmtWon(tripLinkedSum(tvSelected))}` : ""}
+    <button class="btn" id="tvPullBtn" style="margin-left:auto;padding:4px 11px">＋ 생활비에서 가져오기</button></h3>`;
+  if (lk.length) {
+    html += `<table class="ledger-table"><tbody>` + lk.map(e => `<tr>
+      <td style="width:52px">${e.date.slice(5)}</td>
+      <td><span class="badge ${e.type === "exp" ? "e" : "i"}">${e.type === "exp" ? "지출" : "입금"}</span></td>
+      <td class="cat-tag">${esc(e.cat || "-")}</td>
+      <td class="title-cell">${esc(e.title || e.cat || "-")}</td>
+      <td class="cat-tag">${esc(e.who || "-")}</td>
+      <td class="amt ${e.type === "exp" ? "e" : "i"}">${e.type === "exp" ? "-" : "+"}${e.amount.toLocaleString()}</td>
+      <td class="cat-tag">${e.type === "exp" ? (e.settled ? "정산완료" : "미정산") : ""}</td>
+      <td style="width:34px"><div class="row-act"><button class="tv-unlink" data-eid="${e.id}" title="연결 해제 (생활비엔 그대로)">✕</button></div></td></tr>`).join("") + `</tbody></table>`;
+  } else {
+    html += `<div class="empty" style="padding:8px 0;font-size:12px">연결된 생활비 항목이 없어요 — 가계부 행의 ✈ 버튼이나 위 가져오기로 연결</div>`;
+  }
   d.innerHTML = html;
   d.classList.remove("hidden");
   bindTvItems();
+  d.querySelectorAll(".tv-unlink").forEach(b => b.addEventListener("click", () => {
+    const e = entries.find(x => x.id === b.dataset.eid);
+    if (e) delete e.trip;
+    save(); renderTravelList(); toast("연결을 해제했어요 — 생활비엔 그대로 있어요");
+  }));
+  $("tvPullBtn").addEventListener("click", async () => {
+    const r = tripRange(t);
+    if (!r) { toast("먼저 여행 기간을 설정하세요"); return; }
+    const pad = (d2, n) => { const x = new Date(d2 + "T00:00:00"); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
+    const lo = pad(r[0], -7), hi = pad(r[1], 7); // 기간 ±7일 (미리 산 표·늦게 결제된 숙소비)
+    const cands = entries.filter(e => !e.trip && e.date >= lo && e.date <= hi)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    if (!cands.length) { toast("기간 ±7일에 연결할 생활비 항목이 없어요"); return; }
+    const rows2 = cands.map(e => `<label style="display:flex;gap:8px;align-items:center;padding:4px 2px;font-size:13px;cursor:pointer">
+      <input type="checkbox" class="pull-chk" data-eid="${e.id}" ${e.date >= r[0] && e.date <= r[1] && e.type === "exp" ? "checked" : ""}>
+      <span style="width:42px;color:var(--muted)">${e.date.slice(5)}</span>
+      <span class="badge ${e.type === "exp" ? "e" : "i"}" style="flex:none">${e.type === "exp" ? "지출" : "입금"}</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.title || e.cat || "-")}</span>
+      <b>${e.amount.toLocaleString()}</b></label>`).join("");
+    const ok = await dialog({ title: `${esc(t.name)} — 생활비에서 가져오기`,
+      msg: `<div style="max-height:46vh;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:6px 10px">${rows2}</div>
+        <div style="margin-top:8px;font-size:12px;color:var(--muted)">기간 ±7일 항목 · 기간 안 지출은 미리 체크 · 연결해도 생활비엔 그대로</div>`,
+      buttons: [{ label: "취소", value: false }, { label: "연결", value: true, primary: true }] });
+    if (!ok) return;
+    const sel2 = [...document.querySelectorAll(".pull-chk:checked")].map(c => c.dataset.eid);
+    if (!sel2.length) { toast("선택한 항목이 없어요"); return; }
+    const set2 = new Set(sel2);
+    entries.forEach(e => { if (set2.has(e.id)) e.trip = t.id; });
+    save(); renderTravelList(); toast(`${sel2.length}건 연결했어요`);
+  });
   $("tvAddItemBtn").addEventListener("click", () => {
     if ($("tvItemBody").querySelector('.edit-row[data-tid=""]')) return;
     const emp = d.querySelector(".empty");
@@ -5630,6 +5718,7 @@ function renderTravelDetail() {
     t.end = mm2[2];
     save();
     renderTravelList();
+    await offerLinkEntries(t);
   });
 }
 function tvItemRow(it) {
@@ -5933,6 +6022,7 @@ async function tvAddTripForRange(s, e) { // 기간으로 새 여행 만들기 (N
   save();
   renderTravel();
   toast(`${esc(name)} (${fmtRange([s, e])}) 여행을 만들었어요`);
+  await offerLinkEntries(nt);
 }
 async function tvRenameTrip(t) {
   if (!t) return;
