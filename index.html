@@ -2234,10 +2234,14 @@ function renderDistribution() {
   $("catChartTitle").textContent = `${tName} 분포`;
   const mode = $("catChartMode").value; // who=사람별, cat=카테고리별, title=내용별
   // 카테고리별 지출 분포: 지역카드 충전 덩어리는 빼고, 지역카드 사용 상세를 카테고리로 합침 (중복 방지)
+  // 충전 > 사용이면 차액을 "지역카드 잔액"으로 포함 — 분포 총액이 카드 지출과 항상 일치
   let baseList = expList, regionAdd = [];
   if (mode === "cat" && !isInc) {
     baseList = expList.filter(e => !regionCatToCard(e.cat));
     regionAdd = regionUsageInScope();
+    const charge = expList.filter(e => regionCatToCard(e.cat)).reduce((a, e) => a + e.amount, 0);
+    const used = regionAdd.reduce((a, e) => a + e.amount, 0);
+    if (charge - used > 0) regionAdd = [...regionAdd, { cat: "지역카드 잔액", amount: charge - used }];
   }
   const byCat = new Map();
   baseList.forEach(e => {
@@ -4743,7 +4747,7 @@ $("savAddBtn").addEventListener("click", () => {
 
 /* 적금주식 메뉴의 사이드바 (적금/주식/보험) */
 const SAVINGS_NAMES = { deposit: "적금", stock: "주식", pension: "퇴직연금", estate: "부동산", loan: "대출", stats: "통계" };
-let savingsView = "deposit";
+let savingsView = "stock";
 function updateSavingsPh() {
   document.querySelectorAll("#savingsNav .side-item").forEach(x => x.classList.toggle("active", x.dataset.sv === savingsView));
   const stock = savingsView === "stock";
@@ -6078,7 +6082,7 @@ document.querySelectorAll("#mainMenu .nav-item").forEach(b =>
     document.body.classList.toggle("no-side", !ledger && !savings && !ido && !travel);
     if (!window.__bootRestoring) { // 메뉴 진입 시 사이드바는 첫 항목부터 (새로고침 복원 때는 유지)
       if (ledger) view = "list";
-      else if (savings) savingsView = "deposit";
+      else if (savings) savingsView = "stock"; // 재테크 첫 항목 = 주식
       else if (ido) idoView = "deposit";
       else if (travel) travelView = "calendar";
     }
@@ -6187,10 +6191,13 @@ window.addEventListener("focus", async () => {
 $("chkAll").addEventListener("change", () => {
   if (!httpMode && !ghActive() && fsMode && !fileHandle) { toast("파일 연결 중이에요 — 잠시 후 다시 시도해주세요"); updateChkAll(); return; }
   const on = $("chkAll").checked;
-  monthEntries().forEach(e => { if (e.type === "exp") e.settled = on; });
+  // 화면에 보이는 지출 행만 — 멤버(쩡이/슬구)·정산·검색 필터가 걸려 있으면 그 결과만 정산
+  const ids = new Set([...document.querySelectorAll("#listBody .rowchk")]
+    .map(c => c.closest("tr")?.dataset.id).filter(Boolean));
+  entries.forEach(e => { if (ids.has(e.id) && e.type === "exp") e.settled = on; });
   save();
   renderList();
-  toast(on ? "보이는 항목 전체 정산완료" : "전체 정산완료 해제");
+  toast(on ? `보이는 지출 ${ids.size}건 정산완료` : `보이는 지출 ${ids.size}건 정산 해제`);
 });
 $("listAddBtn").addEventListener("click", () => {
   if (document.querySelector('.edit-row:not([data-eid=""])')) render(); // 수정 중이던 행은 원래대로 복귀 (한 번에 하나만)
