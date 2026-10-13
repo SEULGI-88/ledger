@@ -6,7 +6,9 @@
 <title>가계부</title>
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
+<link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="가계부">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1a73e8">
@@ -361,6 +363,10 @@
   .mcal .dc.today { border-color:var(--accent); }
   .mcal .dc.sel { background:var(--accent-soft); border-color:var(--accent); }
   .mcal .dc .dv { color:var(--exp); font-size:9.5px; margin-top:2px; }
+  .mcal .dc .tvb { height:4px; margin:2px -5px 0; } /* 여행 띠 — 음수 마진으로 셀 틈을 건너 이어짐 */
+  .mcal .dc .tvb.st { border-radius:2px 0 0 2px; margin-left:0; }
+  .mcal .dc .tvb.en { border-radius:0 2px 2px 0; margin-right:0; }
+  .mcal .dc .tvb.st.en { border-radius:2px; }
   .mcal .dc .di { color:var(--inc); font-size:9.5px; }
   .mday { font-size:11px; color:var(--muted); margin:12px 2px 4px; }
   .mrow { display:flex; align-items:center; gap:8px; background:var(--card); border-radius:10px; padding:10px 12px; margin-bottom:6px; }
@@ -7099,6 +7105,26 @@ function mRenderCal() {
   const y = +mMonth.slice(0, 4), mo = +mMonth.slice(5, 7);
   const first = new Date(y, mo - 1, 1), days = new Date(y, mo, 0).getDate();
   const hol = holidaysOfYear(y);
+  // 이 달과 겹치는 여행 → 레인 배정 (겹치면 아랫줄)
+  const mFirst = mMonth + "-01", mLast = mMonth + "-" + String(days).padStart(2, "0");
+  const mTrips = travelTrips
+    .map(t => ({ t, rg: tripRange(t) }))
+    .filter(x => x.rg && x.rg[0] <= mLast && x.rg[1] >= mFirst)
+    .sort((a, b) => a.rg[0].localeCompare(b.rg[0]));
+  const lanes = [];
+  mTrips.forEach(x => {
+    let li = lanes.findIndex(l => l[l.length - 1].rg[1] < x.rg[0]);
+    if (li < 0) { lanes.push([x]); } else { lanes[li].push(x); }
+  });
+  const dayBands = (ds) => {
+    const strips = lanes.map(l => {
+      const x = l.find(x2 => ds >= x2.rg[0] && ds <= x2.rg[1]);
+      if (!x) return null;
+      return `<div class="tvb${ds === x.rg[0] ? " st" : ""}${ds === x.rg[1] ? " en" : ""}" style="background:${tripColor(x.t.id)}"></div>`;
+    });
+    while (strips.length && strips[strips.length - 1] === null) strips.pop();
+    return strips.map(s2 => s2 || `<div class="tvb"></div>`).join("");
+  };
   let html = `<div class="mcal">` + ["일", "월", "화", "수", "목", "금", "토"].map(w => `<div class="wd">${w}</div>`).join("");
   for (let i = 0; i < first.getDay(); i++) html += `<div></div>`;
   const byDay = {};
@@ -7109,16 +7135,19 @@ function mRenderCal() {
     const isRed = dow === 0 || dow === 6 || hol[ds];
     const s = byDay[ds];
     html += `<div class="dc${isRed ? " red" : ""}${ds === todayStr() ? " today" : ""}${ds === mDay ? " sel" : ""}" data-d="${ds}">
-      <div class="dn">${d}</div>${s && s.e > 0 ? `<div class="dv">-${compactWon(s.e)}</div>` : ""}${s && s.i > 0 ? `<div class="di">+${compactWon(s.i)}</div>` : ""}</div>`;
+      <div class="dn">${d}</div>${dayBands(ds)}${s && s.e > 0 ? `<div class="dv">-${compactWon(s.e)}</div>` : ""}${s && s.i > 0 ? `<div class="di">+${compactWon(s.i)}</div>` : ""}</div>`;
   }
   html += `</div><div id="mDayList" style="margin-top:12px"></div>`;
   $("mBody").innerHTML = html;
   document.querySelectorAll(".mcal .dc").forEach(c => c.addEventListener("click", () => { mDay = c.dataset.d; mRenderCal(); }));
   const list = entries.filter(e => e.date === mDay).sort((a, b) => (b.seq || 0) - (a.seq || 0));
   const hd = hol[mDay] ? ` · <span style="color:var(--exp)">${esc(hol[mDay])}</span>` : "";
-  $("mDayList").innerHTML = `<div class="mday">${mDay}${hd}</div>` +
+  const dayTrips = mTrips.filter(x => mDay >= x.rg[0] && mDay <= x.rg[1]);
+  const tChips = dayTrips.map(x => ` <span class="mtrip-chip" data-trip="${x.t.id}" style="color:${tripColor(x.t.id)};font-weight:700;cursor:pointer">✈ ${esc(x.t.name)}</span>`).join("");
+  $("mDayList").innerHTML = `<div class="mday">${mDay}${hd}${tChips}</div>` +
     (list.length ? list.map(mRowHtml).join("") : `<div class="mrow" style="color:var(--muted);font-size:12.5px">내역 없음 — 오른쪽 아래 ＋로 추가</div>`);
   mBindRows($("mDayList"));
+  $("mDayList").querySelectorAll(".mtrip-chip").forEach(c => c.addEventListener("click", () => { mView = "travel"; mTravelTrip = c.dataset.trip; mRender(); }));
 }
 function mRenderList() {
   const list = entries.filter(e => fymE(e) === mMonth).sort((a, b) => b.date.localeCompare(a.date) || (b.seq || 0) - (a.seq || 0));
