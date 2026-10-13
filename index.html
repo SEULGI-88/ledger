@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>우리가좍가계부</title>
+<meta name="app-version" content="20261013-1649">
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="manifest" href="manifest.json">
@@ -337,6 +338,10 @@
   #mTitle { flex:1; text-align:center; font-weight:700; font-size:16px; }
   #mFile { display:block; text-align:center; font-size:10.5px; color:var(--muted); padding:3px 8px 6px; background:var(--card); border-bottom:1px solid var(--border); }
   #mBody { flex:1; padding:12px 12px 96px; }
+  #updBar { display:none; }
+  #updBar.show { display:block; position:fixed; left:0; right:0; top:10px; z-index:60; text-align:center; }
+  #updBar button { background:var(--accent); color:#fff; border:none; border-radius:999px; padding:9px 18px;
+                   font-size:13px; font-weight:600; box-shadow:0 4px 14px rgba(23,32,64,.25); cursor:pointer; }
   #mPull { display:none; }
   body.mobile #mPull { display:block; position:fixed; top:0; left:0; right:0; z-index:40; text-align:center;
                        pointer-events:none; transform:translateY(-46px); }
@@ -799,6 +804,7 @@ try {
   <div id="mSheetWrap" class="hidden"><div id="mSheet"></div></div>
   <div id="mPull"><span><i></i><b>당겨서 새로고침</b></span></div>
 </div>
+<div id="updBar"><button type="button">🔄 새 버전이 있어요 — 눌러서 적용</button></div>
 
 <div id="dlgOverlay" class="hidden">
   <div class="dlg">
@@ -7493,6 +7499,25 @@ $("mAddBtn").addEventListener("click", () => {
   if (mView === "more" && mMoreView === "region") return mOpenRegionSheet(null);
   mOpenSheet(null);
 });
+/* 홈 화면 앱은 자체 캐시 때문에 옛 버전이 계속 뜬다 → 주소에 표식을 붙여 새로 받게 한다 */
+function hardReload() { location.replace(location.pathname + "?r=" + Date.now()); }
+/* 서버의 버전 표식만 조금 읽어와(앞 2KB) 지금 돌고 있는 버전과 비교 */
+const APP_VER = (document.querySelector('meta[name="app-version"]') || {}).content || "";
+let lastUpdCheck = 0;
+async function checkAppUpdate() {
+  if (!APP_VER || Date.now() - lastUpdCheck < 300000) return;   // 5분에 한 번까지만
+  lastUpdCheck = Date.now();
+  try {
+    const res = await fetch(location.pathname + "?v=" + Date.now(), { cache: "no-store", headers: { Range: "bytes=0-2047" } });
+    const head = await res.text();
+    const m = head.match(/name="app-version" content="([^"]+)"/);
+    if (m && m[1] !== APP_VER) $("updBar").classList.add("show");
+  } catch (e) { /* 오프라인 등 — 조용히 무시 */ }
+}
+$("updBar").querySelector("button").addEventListener("click", hardReload);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) checkAppUpdate(); });
+setTimeout(checkAppUpdate, 3000);
+
 /* 당겨서 새로고침 — 앱(홈 화면) 모드엔 주소창이 없어서 직접 구현 */
 if (IS_MOBILE) {
   const TRIGGER = 100;
@@ -7524,7 +7549,7 @@ if (IS_MOBILE) {
     spin.style.transform = "";                  // 인라인 각도 제거해야 애니메이션이 돈다
     spin.classList.add("on");
     show(60, "새로고침 중…");
-    setTimeout(() => location.reload(), 120);   // 표시가 보인 뒤 새로고침 (데이터 + 앱 업데이트 반영)
+    setTimeout(hardReload, 120);                // 표시가 보인 뒤 새로고침 (데이터 + 앱 업데이트 반영)
   };
   document.addEventListener("touchend", release, { passive: true });
   document.addEventListener("touchcancel", () => { startY = null; show(0); }, { passive: true });
