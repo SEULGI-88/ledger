@@ -337,6 +337,11 @@
   #mTitle { flex:1; text-align:center; font-weight:700; font-size:16px; }
   #mFile { display:block; text-align:center; font-size:10.5px; color:var(--muted); padding:3px 8px 6px; background:var(--card); border-bottom:1px solid var(--border); }
   #mBody { flex:1; padding:12px 12px 96px; }
+  #mPull { display:none; }
+  body.mobile #mPull { display:block; position:fixed; top:0; left:0; right:0; z-index:40; text-align:center;
+                       pointer-events:none; transform:translateY(-46px); }
+  body.mobile #mPull span { display:inline-block; background:var(--card); color:var(--text-2); border:1px solid var(--border);
+                            border-radius:999px; padding:7px 16px; font-size:12.5px; box-shadow:var(--shadow); }
   #mTabs { position:fixed; left:0; right:0; bottom:0; display:flex; background:var(--card); border-top:1px solid var(--border);
     padding-bottom:env(safe-area-inset-bottom); z-index:12; }
   #mTabs button { flex:1; border:none; background:none; padding:8px 0 6px; font-size:17px; color:var(--muted);
@@ -788,6 +793,7 @@ try {
     <button data-mv="more">⋯<span>더보기</span></button>
   </nav>
   <div id="mSheetWrap" class="hidden"><div id="mSheet"></div></div>
+  <div id="mPull"><span>당겨서 새로고침</span></div>
 </div>
 
 <div id="dlgOverlay" class="hidden">
@@ -6940,7 +6946,8 @@ async function initApp() {
   // GitHub Pages에서 아직 연결 전이면 파일 선택 화면 대신 연결 안내만
   if (location.hostname.endsWith("github.io") && !ghActive()) {
     $("connectOverlay").classList.add("hidden");
-    fileState("☁ 오른쪽 위 'GitHub' 버튼을 눌러 데이터 저장소를 연결하세요");
+    fileState(IS_MOBILE ? "☁ 아래 '더보기 > 설정'에서 GitHub 저장소를 연결하세요"
+                        : "☁ 오른쪽 위 'GitHub' 버튼을 눌러 데이터 저장소를 연결하세요");
     render();
     return;
   }
@@ -7482,6 +7489,39 @@ $("mAddBtn").addEventListener("click", () => {
   if (mView === "more" && mMoreView === "region") return mOpenRegionSheet(null);
   mOpenSheet(null);
 });
+/* 당겨서 새로고침 — 앱(홈 화면) 모드엔 주소창이 없어서 직접 구현 */
+if (IS_MOBILE) {
+  const TRIGGER = 100;
+  const pull = $("mPull"), label = pull.querySelector("span");
+  let startY = null, dist = 0, busy = false;
+  const show = (d, txt) => {
+    pull.style.transform = `translateY(${Math.min(d, 120) - 46}px)`;
+    if (txt) label.textContent = txt;
+  };
+  const blocked = () => busy || !$("mSheetWrap").classList.contains("hidden") || !$("dlgOverlay").classList.contains("hidden");
+  document.addEventListener("touchstart", (ev) => {
+    if (blocked() || window.scrollY > 0 || ev.touches.length !== 1) { startY = null; return; }
+    startY = ev.touches[0].clientY; dist = 0;
+  }, { passive: true });
+  document.addEventListener("touchmove", (ev) => {
+    if (startY === null) return;
+    dist = ev.touches[0].clientY - startY;
+    if (dist <= 0 || window.scrollY > 0) { startY = null; show(0); return; }
+    ev.preventDefault();                       // 당기는 동안 화면이 같이 밀리지 않게
+    show(dist * 0.5, dist > TRIGGER ? "놓으면 새로고침" : "당겨서 새로고침");
+  }, { passive: false });
+  const release = () => {
+    if (startY === null) return;
+    const go = dist > TRIGGER;
+    startY = null;
+    if (!go) { show(0); return; }
+    busy = true;
+    show(60, "새로고침 중…");
+    location.reload();                          // 데이터 + 앱 업데이트까지 같이 반영
+  };
+  document.addEventListener("touchend", release, { passive: true });
+  document.addEventListener("touchcancel", () => { startY = null; show(0); }, { passive: true });
+}
 document.querySelectorAll("#mTabs button").forEach(b => b.addEventListener("click", () => { mView = b.dataset.mv; mMoreView = null; mTravelTrip = null; saveUiState(); mRender(); }));
 $("mPrev").addEventListener("click", () => { mMonth = monthKeyShift(mMonth, -1); mDay = mMonth + "-01"; mRender(); });
 $("mNext").addEventListener("click", () => { mMonth = monthKeyShift(mMonth, 1); mDay = mMonth + "-01"; mRender(); });
