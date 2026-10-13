@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>우리가좍가계부</title>
-<meta name="app-version" content="20261013-1653">
+<meta name="app-version" content="20261013-1702">
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="manifest" href="manifest.json">
@@ -345,11 +345,12 @@
   #mPull { display:none; }
   body.mobile #mPull { display:block; position:fixed; top:0; left:0; right:0; z-index:40; text-align:center;
                        pointer-events:none; transform:translateY(-46px); }
-  body.mobile #mPull span { display:inline-flex; align-items:center; background:var(--card);
-                            border:1px solid var(--border); border-radius:50%; padding:9px; box-shadow:var(--shadow); }
-  body.mobile #mPull i { width:14px; height:14px; border:2px solid var(--border-2); border-top-color:var(--accent);
-                         border-radius:50%; flex:none; }
-  body.mobile #mPull i.on { animation:mspin .7s linear infinite; }
+  body.mobile #mPull svg { width:27px; height:27px; display:inline-block; }
+  body.mobile #mPull circle { fill:none; stroke:var(--muted); stroke-width:3; stroke-linecap:round;
+                              stroke-dasharray:81.7; stroke-dashoffset:81.7;
+                              transform:rotate(-90deg); transform-origin:50% 50%; }
+  body.mobile #mPull.on svg { animation:mspin .8s linear infinite; }
+  body.mobile #mPull.on circle { stroke-dasharray:22 60; stroke-dashoffset:0; }
   @keyframes mspin { to { transform:rotate(360deg); } }
   #mTabs { position:fixed; left:0; right:0; bottom:0; display:flex; background:var(--card); border-top:1px solid var(--border);
     padding-bottom:env(safe-area-inset-bottom); z-index:12; }
@@ -802,7 +803,7 @@ try {
     <button data-mv="more">⋯<span>더보기</span></button>
   </nav>
   <div id="mSheetWrap" class="hidden"><div id="mSheet"></div></div>
-  <div id="mPull"><span><i></i></span></div>
+  <div id="mPull"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="13"/></svg></div>
 </div>
 <div id="updBar"><button type="button">🔄 새 버전이 있어요 — 눌러서 적용</button></div>
 
@@ -7086,6 +7087,8 @@ async function initApp() {
 
 /* ═══════════ 모바일 전용 화면 ═══════════ */
 const IS_MOBILE = (matchMedia("(max-width:700px)").matches || /Android|iPhone|iPod/.test(navigator.userAgent)) && !location.search.includes("desktop");
+// 홈 화면 앱으로 띄웠는지 — 브라우저로 열면 기본 '당겨서 새로고침'이 있어 직접 만든 걸 쓰면 겹친다
+const IS_STANDALONE = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 if (IS_MOBILE) document.body.classList.add("mobile");
 let mView = "cal";
 let mMonth = ym(new Date());
@@ -7518,14 +7521,18 @@ $("updBar").querySelector("button").addEventListener("click", hardReload);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) checkAppUpdate(); });
 setTimeout(checkAppUpdate, 3000);
 
-/* 당겨서 새로고침 — 앱(홈 화면) 모드엔 주소창이 없어서 직접 구현 */
-if (IS_MOBILE) {
+/* 당겨서 새로고침 — 홈 화면 앱엔 브라우저 기본 기능이 없어 직접 구현.
+   사파리·크롬으로 연 경우엔 기본 것이 있으니 건너뛴다 (겹침 방지) */
+if (IS_MOBILE && IS_STANDALONE) {
   const TRIGGER = 100;
-  const pull = $("mPull"), spin = pull.querySelector("i");
+  const pull = $("mPull"), arc = pull.querySelector("circle");
+  const CIRC = 81.7;                                   // 2πr (r=13)
   let startY = null, dist = 0, busy = false;
   const show = (d) => {
-    pull.style.transform = `translateY(${Math.min(d, 120) - 46}px)`;
-    if (!busy) spin.style.transform = `rotate(${Math.round(d * 2.6)}deg)`; // 당기는 만큼 같이 돎
+    pull.style.transform = `translateY(${Math.min(d, 120) - 44}px)`;
+    if (busy) return;
+    const p = Math.max(0, Math.min(1, dist / TRIGGER)); // 당긴 만큼 원이 그려짐
+    arc.style.strokeDashoffset = (CIRC * (1 - p)).toFixed(1);
   };
   const blocked = () => busy || !$("mSheetWrap").classList.contains("hidden") || !$("dlgOverlay").classList.contains("hidden");
   document.addEventListener("touchstart", (ev) => {
@@ -7545,8 +7552,8 @@ if (IS_MOBILE) {
     startY = null;
     if (!go) { show(0); return; }
     busy = true;
-    spin.style.transform = "";                  // 인라인 각도 제거해야 애니메이션이 돈다
-    spin.classList.add("on");
+    arc.style.strokeDashoffset = "";             // 인라인 값 제거해야 회전 상태 스타일이 먹는다
+    pull.classList.add("on");
     show(60);
     setTimeout(hardReload, 120);                // 표시가 보인 뒤 새로고침 (데이터 + 앱 업데이트 반영)
   };
