@@ -310,6 +310,8 @@
   .dlg .ci-modal input[type="text"] { margin:0; }
   .dlg .ci-modal select { margin:0; width:auto; }
   .dlg .ci-modal th { font-weight:600; color:var(--muted); }
+  body.mobile .dlg, body.mobile .dlg.dlg-wide { max-width:96vw; max-height:88dvh; overflow:auto; padding:16px 14px 14px; }
+  body.mobile .dlg .ci-modal { overflow-x:auto; } /* 표가 넓으면 모달 안에서 가로 스크롤 */
   @keyframes dlgIn { from { transform:scale(.94); opacity:0; } to { transform:scale(1); opacity:1; } }
   .dlg h3 { font-size:15.5px; margin-bottom:10px; }
   .dlg p { font-size:13px; color:var(--text-2); line-height:1.7; margin-bottom:16px; }
@@ -775,8 +777,9 @@ try {
   <nav id="mTabs">
     <button data-mv="cal">📅<span>달력</span></button>
     <button data-mv="list">☰<span>목록</span></button>
-    <button data-mv="stats">📊<span>요약</span></button>
-    <button data-mv="more">⚙<span>설정</span></button>
+    <button data-mv="stats">📊<span>통계</span></button>
+    <button data-mv="travel">✈<span>여행</span></button>
+    <button data-mv="more">⋯<span>더보기</span></button>
   </nav>
   <div id="mSheetWrap" class="hidden"><div id="mSheet"></div></div>
 </div>
@@ -7064,14 +7067,21 @@ if (IS_MOBILE) document.body.classList.add("mobile");
 let mView = "cal";
 let mMonth = ym(new Date());
 let mDay = todayStr();
+let mMoreView = null; // 더보기 하위: null(메뉴)|region|ido|set
+let mTravelTrip = null; // 여행 상세에서 보고 있는 trip id
 const mfmt = (n) => (n || 0).toLocaleString("ko-KR");
 function mRender() {
   if (!IS_MOBILE) return;
   document.querySelectorAll("#mTabs button").forEach(b => b.classList.toggle("active", b.dataset.mv === mView));
-  $("mTitle").textContent = `${+mMonth.slice(0, 4)}년 ${+mMonth.slice(5, 7)}월`;
+  const monTitle = `${+mMonth.slice(0, 4)}년 ${+mMonth.slice(5, 7)}월`;
+  $("mTitle").textContent =
+    mView === "travel" ? "여행" :
+    mView === "more" ? (mMoreView === "region" ? `${+mMonth.slice(5, 7)}월 지역카드` : mMoreView === "ido" ? "이도계좌" : mMoreView === "set" ? "설정" : "더보기") :
+    monTitle;
   if (mView === "cal") mRenderCal();
   else if (mView === "list") mRenderList();
   else if (mView === "stats") mRenderStats();
+  else if (mView === "travel") mRenderTravel();
   else mRenderMore();
 }
 function mRowHtml(e) {
@@ -7135,24 +7145,56 @@ function mRenderStats() {
     <div class="mstat"><div class="l">남은 금액</div><div class="v" style="color:${(bi.remain || 0) >= 0 ? "var(--inc)" : "var(--exp)"}">${bi.remain != null ? mfmt(bi.remain) : "-"}</div></div>
     <div class="mstat"><div class="l">입금</div><div class="v" style="color:var(--inc)">+${mfmt(inc)}</div></div>
     <div class="mstat"><div class="l">지출</div><div class="v" style="color:var(--exp)">-${mfmt(exp)}</div></div></div>
-    <div class="mday">지출 TOP 5 (내용별)</div>`;
+    <div class="mday">카테고리별 지출</div>`;
+  const exps = list.filter(e => e.type === "exp");
+  const byCat = {};
+  exps.forEach(e => { const k = e.cat || "기타"; byCat[k] = (byCat[k] || 0) + e.amount; });
+  const cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+  const cmx = cats.length ? cats[0][1] : 1;
+  cats.forEach(([k, v]) => {
+    html += `<div class="mbar"><div class="bl"><span>${esc(k)}</span><b>-${mfmt(v)}</b></div><div class="bt"><i style="width:${Math.round(v / cmx * 100)}%"></i></div></div>`;
+  });
+  if (!cats.length) html += `<div class="mrow" style="color:var(--muted)">지출이 없어요</div>`;
+  const byWho = {};
+  exps.forEach(e => { const k = e.who || "-"; byWho[k] = (byWho[k] || 0) + e.amount; });
+  const whoL = Object.entries(byWho).sort((a, b) => b[1] - a[1]);
+  if (whoL.length) {
+    html += `<div class="mday">멤버별 지출</div><div class="mstats">`;
+    whoL.forEach(([k, v]) => { html += `<div class="mstat"><div class="l">${esc(k)}</div><div class="v" style="color:var(--exp)">-${mfmt(v)}</div></div>`; });
+    html += `</div>`;
+  }
   const by = {};
-  list.filter(e => e.type === "exp").forEach(e => { const k = e.title || "기타"; by[k] = (by[k] || 0) + e.amount; });
+  exps.forEach(e => { const k = e.title || "기타"; by[k] = (by[k] || 0) + e.amount; });
   const top = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const mx = top.length ? top[0][1] : 1;
+  if (top.length) html += `<div class="mday">지출 TOP 5 (내용별)</div>`;
   top.forEach(([k, v]) => {
     html += `<div class="mbar"><div class="bl"><span>${esc(k)}</span><b>-${mfmt(v)}</b></div><div class="bt"><i style="width:${Math.round(v / mx * 100)}%"></i></div></div>`;
   });
-  if (!top.length) html += `<div class="mrow" style="color:var(--muted)">지출이 없어요</div>`;
   $("mBody").innerHTML = html;
 }
 function mRenderMore() {
+  if (mMoreView === "region") return mRenderRegionM();
+  if (mMoreView === "ido") return mRenderIdoM();
+  if (mMoreView !== "set") {
+    $("mBody").innerHTML = `
+      <div class="mday">메뉴</div>
+      <div class="mrow" data-mm="region"><div class="tt"><b>💳 지역카드</b><small>잔액과 이달 내역 · 사용/충전 추가</small></div><div class="amt">›</div></div>
+      <div class="mrow" data-mm="ido"><div class="tt"><b>🏦 이도계좌</b><small>예금·적금·주식 총자산</small></div><div class="amt">›</div></div>
+      <div class="mrow" data-mm="set"><div class="tt"><b>⚙ 설정</b><small>GitHub 연결·새로고침·PC 화면</small></div><div class="amt">›</div></div>
+      <div class="mrow" id="mCardImport"><div class="tt"><b>💳 카드내역 업로드</b><small>삼성·현대·여민전 등 내역 파일로 자동 등록</small></div><div class="amt">›</div></div>`;
+    $("mBody").querySelectorAll("[data-mm]").forEach(r => r.addEventListener("click", () => { mMoreView = r.dataset.mm; mRender(); }));
+    $("mCardImport").addEventListener("click", () => $("cardImportInput").click());
+    return;
+  }
   $("mBody").innerHTML = `
+    <div class="mday" id="mBackBtn" style="cursor:pointer">← 더보기</div>
     <div class="mstat" style="margin-bottom:10px"><div class="l">연결 상태</div><div class="v" style="font-size:13px;font-weight:400">${esc($("fileState").textContent || "-")}</div></div>
     <button class="btn" id="mGh" style="width:100%;padding:12px;margin-bottom:8px">☁ GitHub 연결 설정</button>
     <button class="btn" id="mReload" style="width:100%;padding:12px;margin-bottom:8px">↻ 최신 데이터 다시 불러오기</button>
     <button class="btn" id="mDesk" style="width:100%;padding:12px">🖥 PC 화면으로 보기</button>
-    <p style="font-size:11.5px;color:var(--muted);margin-top:14px">고정지출·통계 차트·여행기록은 PC 화면에서 쓸 수 있어요.</p>`;
+    <p style="font-size:11.5px;color:var(--muted);margin-top:14px">고정지출·정산·여행 추가 등 세부 기능은 PC 화면에서 쓸 수 있어요.</p>`;
+  $("mBackBtn").addEventListener("click", () => { mMoreView = null; mRender(); });
   $("mGh").addEventListener("click", () => $("ghBtn").click());
   $("mReload").addEventListener("click", async () => {
     if (ghActive()) { try { await ghLoad(true); mRender(); toast("최신 데이터를 불러왔어요"); } catch (e) { toast("불러오기 실패: " + e.message); } }
@@ -7214,8 +7256,204 @@ function mOpenSheet(e) { // e 있으면 수정, 없으면 새 입력
   $("mAmt").focus();
 }
 function mCloseSheet() { $("mSheetWrap").classList.add("hidden"); }
-$("mAddBtn").addEventListener("click", () => mOpenSheet(null));
-document.querySelectorAll("#mTabs button").forEach(b => b.addEventListener("click", () => { mView = b.dataset.mv; saveUiState(); mRender(); }));
+/* ───── 모바일 여행 ───── */
+function mRenderTravel() {
+  if (mTravelTrip) return mRenderTravelDetail();
+  const trips = travelTrips.slice().sort((a, b) => (b.start || "").localeCompare(a.start || ""));
+  let html = `<div class="mday">여행 목록</div>`;
+  trips.forEach(t => {
+    html += `<div class="mrow" data-tv="${t.id}"><div class="tt"><b><span style="color:${tripColor(t.id)}">●</span> ${esc(t.name)}</b><small>${fmtRange(tripRange(t))}</small></div><div class="amt e">-${mfmt(Math.round(tripTotal(t.id)))}</div></div>`;
+  });
+  if (!trips.length) html += `<div class="mrow" style="color:var(--muted)">여행이 없어요 — 여행 추가는 PC 화면에서</div>`;
+  $("mBody").innerHTML = html;
+  $("mBody").querySelectorAll("[data-tv]").forEach(r => r.addEventListener("click", () => { mTravelTrip = r.dataset.tv; mRender(); }));
+}
+function mRenderTravelDetail() {
+  const t = tripById(mTravelTrip);
+  if (!t) { mTravelTrip = null; return mRenderTravel(); }
+  const items = travelItems.filter(x => x.trip === t.id).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const linked = tripLinkedEntries(t.id).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  let html = `<div class="mday" id="mBackBtn" style="cursor:pointer">← 여행 목록</div>
+    <div class="mstats"><div class="mstat"><div class="l">${esc(t.name)} · ${fmtRange(tripRange(t))}</div><div class="v" style="color:var(--exp)">-${mfmt(Math.round(tripTotal(t.id)))}</div></div></div>`;
+  items.forEach(it => {
+    html += `<div class="mrow" data-ti="${it.id}"><div class="tt"><b>${esc(it.title || "(내용 없음)")}</b><small>${it.date ? it.date.slice(5) : ""}${it.memo ? " · " + esc(it.memo) : ""}</small></div><div class="amt e">-${mfmt(it.amount)}</div></div>`;
+  });
+  linked.forEach(e2 => {
+    html += `<div class="mrow"><div class="tt"><b>${esc(e2.title || "(내용 없음)")}</b><small>${e2.date ? e2.date.slice(5) : ""} · 생활비 연결${e2.who ? " · " + esc(e2.who) : ""}</small></div><div class="amt e">-${mfmt(e2.amount)}</div></div>`;
+  });
+  if (!items.length && !linked.length) html += `<div class="mrow" style="color:var(--muted)">내역 없음 — 오른쪽 아래 ＋로 추가</div>`;
+  $("mBody").innerHTML = html;
+  $("mBackBtn").addEventListener("click", () => { mTravelTrip = null; mRender(); });
+  $("mBody").querySelectorAll("[data-ti]").forEach(r => r.addEventListener("click", () => {
+    const it = travelItems.find(x => x.id === r.dataset.ti);
+    if (it) mOpenTravelSheet(it);
+  }));
+}
+function mOpenTravelSheet(it) {
+  const isEdit = !!it;
+  const trips = travelTrips.slice().sort((a, b) => (b.start || "").localeCompare(a.start || ""));
+  if (!trips.length) { toast("먼저 PC 화면에서 여행을 추가하세요"); return; }
+  const d = it ? { ...it } : { trip: mTravelTrip || trips[0].id, date: "", title: "", amount: 0, memo: "" };
+  if (!d.date) { const t0 = tripById(d.trip); d.date = (t0 && t0.start) || todayStr(); }
+  $("mSheetWrap").classList.remove("hidden");
+  $("mSheet").innerHTML = `
+    <div class="fld"><label>여행</label><select id="mTvTrip">${trips.map(t => `<option value="${t.id}"${d.trip === t.id ? " selected" : ""}>${esc(t.name)} · ${fmtRange(tripRange(t))}</option>`).join("")}</select></div>
+    <div class="fld"><label>금액</label><input id="mTvAmt" inputmode="numeric" value="${d.amount ? d.amount.toLocaleString() : ""}" placeholder="0"></div>
+    <div class="fld"><label>내용</label><input id="mTvTitle" value="${esc(d.title || "")}" placeholder="예: 숙소"></div>
+    <div style="display:flex;gap:8px">
+      <div class="fld" style="flex:1"><label>날짜</label><input id="mTvDate" inputmode="numeric" value="${d.date}" placeholder="260911"></div>
+      <div class="fld" style="flex:1"><label>메모</label><input id="mTvMemo" value="${esc(d.memo || "")}"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      ${isEdit ? `<button class="btn" id="mTvDel" style="color:var(--exp);padding:12px 16px">🗑</button>` : ""}
+      <button class="btn" id="mTvCancel" style="flex:1;padding:12px">취소</button>
+      <button class="add-btn" id="mTvSave" style="flex:2;padding:12px">저장</button>
+    </div>`;
+  bindAmountInput($("mTvAmt"));
+  $("mTvCancel").addEventListener("click", mCloseSheet);
+  $("mSheetWrap").addEventListener("click", (ev) => { if (ev.target.id === "mSheetWrap") mCloseSheet(); }, { once: true });
+  if (isEdit) $("mTvDel").addEventListener("click", async () => {
+    if (!await uiConfirm("이 내역을 삭제할까요?", { ok: "삭제" })) return;
+    travelItems = travelItems.filter(x => x.id !== it.id);
+    save(); mCloseSheet(); mRender(); toast("삭제했어요");
+  });
+  $("mTvSave").addEventListener("click", () => {
+    const amount = parseAmount($("mTvAmt").value);
+    const title = $("mTvTitle").value.trim();
+    if (!amount && !title) { toast("내용이나 금액을 입력하세요"); return; }
+    const date = smartDate($("mTvDate").value, +(d.date || todayStr()).slice(0, 4));
+    if (date === null) { toast("날짜 형식을 확인하세요 (예: 260911)"); return; }
+    const data = { trip: $("mTvTrip").value, date, title, amount: amount || 0, memo: $("mTvMemo").value.trim() };
+    if (isEdit) { const x = travelItems.find(r => r.id === it.id); if (x) Object.assign(x, data); toast("수정했어요"); }
+    else { travelItems.push({ id: uid(), ...data }); toast("추가했어요"); }
+    mTravelTrip = data.trip;
+    save(); mCloseSheet(); mRender();
+  });
+  $("mTvAmt").focus();
+}
+/* ───── 모바일 지역카드 ───── */
+function mRenderRegionM() {
+  const all = regionAll();
+  const bw = {};
+  all.forEach(t => { const k = (t.who || "-") + "|" + (t.card || "-"); (bw[k] = bw[k] || { charge: 0, use: 0 })[t.type === "충전" ? "charge" : "use"] += t.amount || 0; });
+  const order = ["쩡이", "슬구", "현금"];
+  const keys = Object.keys(bw).sort((a, b) => {
+    const ia = order.indexOf(a.split("|")[0]), ib = order.indexOf(b.split("|")[0]);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+  });
+  let html = `<div class="mday" id="mBackBtn" style="cursor:pointer">← 더보기</div><div class="mstats">`;
+  let shown = 0;
+  keys.forEach(k => {
+    const b = bw[k], rem = b.charge - b.use;
+    const inMon = all.some(t => (t.who || "-") + "|" + (t.card || "-") === k && (t.date || "").startsWith(mMonth));
+    if (Math.round(rem) === 0 && !inMon) return;
+    shown++;
+    html += `<div class="mstat"><div class="l">${esc(k.split("|")[0])} · ${esc(k.split("|")[1])}</div><div class="v" style="color:${rem >= 0 ? "var(--inc)" : "var(--exp)"}">${mfmt(Math.round(rem))}</div></div>`;
+  });
+  if (!shown) html += `<div class="mstat"><div class="l">잔액</div><div class="v" style="font-size:13px;font-weight:400">남은 카드가 없어요</div></div>`;
+  html += `</div><div class="mday">${+mMonth.slice(5, 7)}월 내역 <span style="color:var(--muted);font-weight:400">· 위 ◀▶로 달 이동</span></div>`;
+  const tx = all.filter(t => (t.date || "").startsWith(mMonth)).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  tx.forEach(t => {
+    html += `<div class="mrow" data-rg="${t.auto ? "" : t.id}"><div class="tt"><b>${esc(t.title || "-")}</b><small>${esc(t.card || "")} · ${esc(t.who || "")}${t.date ? " · " + t.date.slice(5) : ""}${t.auto ? " · 생활비" : ""}</small></div><div class="amt ${t.type === "충전" ? "i" : "e"}">${t.type === "충전" ? "+" : "-"}${mfmt(t.amount)}</div></div>`;
+  });
+  if (!tx.length) html += `<div class="mrow" style="color:var(--muted)">이 달 내역이 없어요</div>`;
+  $("mBody").innerHTML = html;
+  $("mBackBtn").addEventListener("click", () => { mMoreView = null; mRender(); });
+  $("mBody").querySelectorAll("[data-rg]").forEach(r => {
+    if (!r.dataset.rg) return;
+    r.addEventListener("click", () => { const t = regionTx.find(x => x.id === r.dataset.rg); if (t) mOpenRegionSheet(t); });
+  });
+}
+function mOpenRegionSheet(t) {
+  const isEdit = !!t;
+  const cards = [...new Set(regionCards.concat(regionTx.map(x => x.card).filter(Boolean)))];
+  if (!cards.length) { toast("먼저 PC 화면에서 지역카드를 추가하세요"); return; }
+  const d = t ? { ...t } : { card: cards[0], who: lastWho(), date: todayStr(), type: "사용", title: "", amount: 0 };
+  $("mSheetWrap").classList.remove("hidden");
+  $("mSheet").innerHTML = `
+    <div class="mtype">
+      <button id="mRuse" class="${d.type !== "충전" ? "on-exp" : ""}">사용</button>
+      <button id="mRchg" class="${d.type === "충전" ? "on-inc" : ""}">충전</button>
+    </div>
+    <div class="fld"><label>금액</label><input id="mRamt" inputmode="numeric" value="${d.amount ? d.amount.toLocaleString() : ""}" placeholder="0"></div>
+    <div class="fld"><label>내용</label><input id="mRtitle" value="${esc(d.title || "")}" placeholder="예: 마트"></div>
+    <div style="display:flex;gap:8px">
+      <div class="fld" style="flex:1"><label>카드</label><select id="mRcard">${cards.map(c => `<option${d.card === c ? " selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
+      <div class="fld" style="width:92px"><label>멤버</label><select id="mRwho">${["쩡이", "슬구", "현금"].map(w => `<option${d.who === w ? " selected" : ""}>${w}</option>`).join("")}</select></div>
+    </div>
+    <div class="fld"><label>날짜</label><input id="mRdate" inputmode="numeric" value="${d.date}" placeholder="260911"></div>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      ${isEdit ? `<button class="btn" id="mRdel" style="color:var(--exp);padding:12px 16px">🗑</button>` : ""}
+      <button class="btn" id="mRcancel" style="flex:1;padding:12px">취소</button>
+      <button class="add-btn" id="mRsave" style="flex:2;padding:12px">저장</button>
+    </div>`;
+  let rType = d.type === "충전" ? "충전" : "사용";
+  const setT = (t2) => { rType = t2; $("mRuse").className = t2 === "사용" ? "on-exp" : ""; $("mRchg").className = t2 === "충전" ? "on-inc" : ""; };
+  $("mRuse").addEventListener("click", () => setT("사용"));
+  $("mRchg").addEventListener("click", () => setT("충전"));
+  bindAmountInput($("mRamt"));
+  $("mRcancel").addEventListener("click", mCloseSheet);
+  $("mSheetWrap").addEventListener("click", (ev) => { if (ev.target.id === "mSheetWrap") mCloseSheet(); }, { once: true });
+  if (isEdit) $("mRdel").addEventListener("click", async () => {
+    if (!await uiConfirm("이 내역을 삭제할까요?", { ok: "삭제" })) return;
+    regionTx = regionTx.filter(x => x.id !== t.id);
+    save(); mCloseSheet(); mRender(); toast("삭제했어요");
+  });
+  $("mRsave").addEventListener("click", () => {
+    const amount = parseAmount($("mRamt").value);
+    if (!amount) { toast("금액을 입력하세요"); return; }
+    const date = smartDate($("mRdate").value, +mMonth.slice(0, 4));
+    if (date === null) { toast("날짜 형식을 확인하세요 (예: 260911)"); return; }
+    const data = { card: $("mRcard").value, who: $("mRwho").value, date, type: rType, title: $("mRtitle").value.trim(), amount };
+    if (isEdit) { const x = regionTx.find(r => r.id === t.id); if (x) Object.assign(x, data); toast("수정했어요"); }
+    else { regionTx.push({ id: uid(), ...data }); toast("추가했어요"); }
+    save(); mCloseSheet(); mRender();
+  });
+  $("mRamt").focus();
+}
+/* ───── 모바일 이도계좌 (조회 전용) ───── */
+function mRenderIdoM() {
+  const intSum = idoDeposits.reduce((a, d) => a + idoInterest(d), 0);
+  const nowSum = idoDeposits.reduce((a, d) => a + idoInterestNow(d), 0);
+  const idoStk = stocks.filter(s => (s.who || "") === "이도");
+  let buy = 0, evalV = 0, counted = 0;
+  idoStk.forEach(s => {
+    const p = stkPrice(s);
+    const b = stkKrw(s, s.avg * s.qty);
+    const e2 = p != null ? stkKrw(s, p * s.qty) : null;
+    if (b != null && e2 != null) { buy += b; evalV += e2; counted++; }
+  });
+  const profit = evalV - buy;
+  const total = idoDeposits.reduce((a, d) => a + idoBalanceNow(d), 0) + evalV;
+  let html = `<div class="mday" id="mBackBtn" style="cursor:pointer">← 더보기</div>
+    <div class="mstats">
+      <div class="mstat"><div class="l">총자산</div><div class="v">${mfmt(Math.round(total))}</div></div>
+      <div class="mstat"><div class="l">주식 손익${counted < idoStk.length ? ` (시세 ${counted}/${idoStk.length})` : ""}</div><div class="v" style="color:${profit >= 0 ? "var(--exp)" : "var(--accent)"}">${buy ? (profit >= 0 ? "+" : "") + mfmt(Math.round(profit)) : "-"}</div></div>
+      <div class="mstat"><div class="l">만기 예상이자</div><div class="v" style="color:var(--inc)">+${mfmt(Math.round(intSum))}</div></div>
+      <div class="mstat"><div class="l">지금 해지 시</div><div class="v" style="color:#a16207">+${mfmt(Math.round(nowSum))}</div></div>
+    </div><div class="mday">예·적금</div>`;
+  idoDeposits.forEach(d => {
+    html += `<div class="mrow"><div class="tt"><b>${esc(d.bank || "")} ${esc(d.name || "")}</b><small>${esc(d.kind || "예금")} · ${d.rate || 0}%${d.end ? " · 만기 " + d.end : ""}</small></div><div class="amt">${mfmt(Math.round(idoBalanceNow(d)))}</div></div>`;
+  });
+  if (!idoDeposits.length) html += `<div class="mrow" style="color:var(--muted)">예금이 없어요</div>`;
+  if (idoStk.length) {
+    html += `<div class="mday">주식</div>`;
+    idoStk.forEach(s => {
+      const p = stkPrice(s);
+      const e2 = p != null ? stkKrw(s, p * s.qty) : null;
+      html += `<div class="mrow"><div class="tt"><b>${esc(s.name || s.code)}</b><small>${s.qty}주 · 평단 ${mfmt(s.avg)}</small></div><div class="amt">${e2 != null ? mfmt(Math.round(e2)) : "-"}</div></div>`;
+    });
+  }
+  html += `<p style="font-size:11.5px;color:var(--muted);margin-top:10px">수정·추가는 PC 화면의 이도계좌 메뉴에서 할 수 있어요.</p>`;
+  $("mBody").innerHTML = html;
+  $("mBackBtn").addEventListener("click", () => { mMoreView = null; mRender(); });
+}
+$("mAddBtn").addEventListener("click", () => {
+  if (mView === "travel") return mOpenTravelSheet(null);
+  if (mView === "more" && mMoreView === "region") return mOpenRegionSheet(null);
+  mOpenSheet(null);
+});
+document.querySelectorAll("#mTabs button").forEach(b => b.addEventListener("click", () => { mView = b.dataset.mv; mMoreView = null; mTravelTrip = null; saveUiState(); mRender(); }));
 $("mPrev").addEventListener("click", () => { mMonth = monthKeyShift(mMonth, -1); mDay = mMonth + "-01"; mRender(); });
 $("mNext").addEventListener("click", () => { mMonth = monthKeyShift(mMonth, 1); mDay = mMonth + "-01"; mRender(); });
 $("mToday").addEventListener("click", () => { mMonth = ym(new Date()); mDay = todayStr(); mRender(); });
