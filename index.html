@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>우리가좍가계부</title>
-<meta name="app-version" content="20261013-1649">
+<meta name="app-version" content="20261013-1653">
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="manifest" href="manifest.json">
@@ -345,8 +345,8 @@
   #mPull { display:none; }
   body.mobile #mPull { display:block; position:fixed; top:0; left:0; right:0; z-index:40; text-align:center;
                        pointer-events:none; transform:translateY(-46px); }
-  body.mobile #mPull span { display:inline-flex; align-items:center; gap:7px; background:var(--card); color:var(--text-2);
-                            border:1px solid var(--border); border-radius:999px; padding:7px 16px; font-size:12.5px; box-shadow:var(--shadow); }
+  body.mobile #mPull span { display:inline-flex; align-items:center; background:var(--card);
+                            border:1px solid var(--border); border-radius:50%; padding:9px; box-shadow:var(--shadow); }
   body.mobile #mPull i { width:14px; height:14px; border:2px solid var(--border-2); border-top-color:var(--accent);
                          border-radius:50%; flex:none; }
   body.mobile #mPull i.on { animation:mspin .7s linear infinite; }
@@ -802,7 +802,7 @@ try {
     <button data-mv="more">⋯<span>더보기</span></button>
   </nav>
   <div id="mSheetWrap" class="hidden"><div id="mSheet"></div></div>
-  <div id="mPull"><span><i></i><b>당겨서 새로고침</b></span></div>
+  <div id="mPull"><span><i></i></span></div>
 </div>
 <div id="updBar"><button type="button">🔄 새 버전이 있어요 — 눌러서 적용</button></div>
 
@@ -7521,11 +7521,10 @@ setTimeout(checkAppUpdate, 3000);
 /* 당겨서 새로고침 — 앱(홈 화면) 모드엔 주소창이 없어서 직접 구현 */
 if (IS_MOBILE) {
   const TRIGGER = 100;
-  const pull = $("mPull"), label = pull.querySelector("b"), spin = pull.querySelector("i");
+  const pull = $("mPull"), spin = pull.querySelector("i");
   let startY = null, dist = 0, busy = false;
-  const show = (d, txt) => {
+  const show = (d) => {
     pull.style.transform = `translateY(${Math.min(d, 120) - 46}px)`;
-    if (txt) label.textContent = txt;
     if (!busy) spin.style.transform = `rotate(${Math.round(d * 2.6)}deg)`; // 당기는 만큼 같이 돎
   };
   const blocked = () => busy || !$("mSheetWrap").classList.contains("hidden") || !$("dlgOverlay").classList.contains("hidden");
@@ -7538,7 +7537,7 @@ if (IS_MOBILE) {
     dist = ev.touches[0].clientY - startY;
     if (dist <= 0 || window.scrollY > 0) { startY = null; show(0); return; }
     ev.preventDefault();                       // 당기는 동안 화면이 같이 밀리지 않게
-    show(dist * 0.5, dist > TRIGGER ? "놓으면 새로고침" : "당겨서 새로고침");
+    show(dist * 0.5);
   }, { passive: false });
   const release = () => {
     if (startY === null) return;
@@ -7548,7 +7547,7 @@ if (IS_MOBILE) {
     busy = true;
     spin.style.transform = "";                  // 인라인 각도 제거해야 애니메이션이 돈다
     spin.classList.add("on");
-    show(60, "새로고침 중…");
+    show(60);
     setTimeout(hardReload, 120);                // 표시가 보인 뒤 새로고침 (데이터 + 앱 업데이트 반영)
   };
   document.addEventListener("touchend", release, { passive: true });
