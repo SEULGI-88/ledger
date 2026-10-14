@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>우리가좍가계부</title>
-<meta name="app-version" content="20261014-1729">
+<meta name="app-version" content="20261014-1734">
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="manifest" href="manifest.json">
@@ -759,6 +759,9 @@ try {
     <p style="font-size:11.5px;color:var(--muted);margin-top:8px">이자소득세 15.4%(소득세 14%＋지방세 1.4%)를 세전이자에서 자동 공제. 비과세 상품은 추가 시 체크하세요. 단리 기준 예상치입니다.</p>
   </div>
   <div id="stockView" class="hidden">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+      <button class="btn" id="stkCurBtn" style="padding:5px 14px" title="합계를 원화/달러로 바꿔 봅니다">$ 달러로 보기</button>
+    </div>
     <div class="stats" id="stkCards" style="margin-bottom:12px"></div>
     <div class="card table-scroll">
       <table class="ledger-table">
@@ -915,6 +918,7 @@ let travelTrips = []; // 여행 목록: {name, start, end} — 엑셀 "여행목
 let travelItems = []; // 여행 내역: {id, trip, date, title, amount, memo} — 엑셀 "여행내역" 시트
 let stocks = []; // 주식: {id, who(쩡이/슬구/이도), market(KR/US), code, name, avg, qty} — 엑셀 "주식" 시트 (재테크·이도계좌 공용, who 로 분리)
 let stockScope = "fam"; // 주식 화면 스코프: fam=재테크(쩡이/슬구), ido=이도계좌 — 같은 기능, 데이터는 소유자로 분리
+let stkCur = localStorage.getItem("ledgerStkCur") || "KRW"; // 합계 표시 통화 (KRW | USD)
 let idoDeposits = []; // 이도 예금: {id, bank, acct, name, kind(예금/적금/예수금), amount, rate, start, end, memo} — 엑셀 "이도예금" 시트
 let stockPrices = { prices: {}, usdkrw: null, updated: null }; // 시세 — GitHub Actions가 장 마감 후 prices.json 갱신
 let stocksDirty = false; // 종목 목록이 바뀌면 stocks.json 재업로드
@@ -4236,16 +4240,33 @@ function renderStocks() {
     });
     return { buy, evalV, counted, total: list.length };
   };
+  // 합계 표시 통화 — 달러 보기는 환율이 있을 때만 (없으면 원화로 둔다)
+  const usd = stkCur === "USD" && stockPrices.usdkrw > 0;
+  const cv = (won) => usd ? won / stockPrices.usdkrw : won;            // 원화 → 표시 통화
+  const money = (won) => usd
+    ? "$" + cv(won).toLocaleString("en-US", { maximumFractionDigits: 0 })
+    : fmt(won) + "원";
+  $("stkCurBtn").textContent = stkCur === "USD" ? "₩ 원화로 보기" : "$ 달러로 보기";
+  $("stkCurBtn").disabled = !(stockPrices.usdkrw > 0);
   const cardHtml = (label, c) => {
     const profit = c.evalV - c.buy;
     const rate = c.buy ? (profit / c.buy * 100) : 0;
     const col = profit >= 0 ? "var(--exp)" : "var(--accent)"; // 수익=빨강, 손실=파랑 (국내 관례)
     return `<div class="stat"><div class="label">${esc(label)}${c.counted < c.total ? ` <span style="color:var(--muted)">(시세 ${c.counted}/${c.total}종목)</span>` : ""}</div>
-      <div class="value" style="color:${col}">${c.buy ? (profit >= 0 ? "+" : "") + fmt(profit) + "원 (" + (rate >= 0 ? "+" : "") + rate.toFixed(1) + "%)" : "-"}</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:2px">매입 ${fmt(c.buy)} → 평가 ${fmt(c.evalV)}</div></div>`;
+      <div class="value" style="color:${col}">${c.buy ? (profit >= 0 ? "+" : "") + money(profit) + " (" + (rate >= 0 ? "+" : "") + rate.toFixed(1) + "%)" : "-"}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">매입 ${money(c.buy)} → 평가 ${money(c.evalV)}</div></div>`;
   };
+  const totalC = calc(scoped);
+  const totalProfit = totalC.evalV - totalC.buy;
+  const totalCards = scoped.length ? `
+    <div class="stat"><div class="label">주식 총 합계 <span style="color:var(--muted);font-size:11px">평가금액</span></div>
+      <div class="value">${money(totalC.evalV)}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">매입 ${money(totalC.buy)} · ${totalC.total}종목</div></div>
+    <div class="stat"><div class="label">수익 총합계</div>
+      <div class="value" style="color:${totalProfit >= 0 ? "var(--exp)" : "var(--accent)"}">${totalC.buy ? (totalProfit >= 0 ? "+" : "") + money(totalProfit) + " (" + (totalProfit >= 0 ? "+" : "") + (totalProfit / totalC.buy * 100).toFixed(1) + "%)" : "-"}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">${usd ? "환율 " + Number(stockPrices.usdkrw).toFixed(1) + "원/$ 기준" : "원화 환산 기준"}</div></div>` : "";
   $("stkCards").innerHTML = scoped.length
-    ? order.map(w => cardHtml(w + " 주식", calc(groups[w]))).join("") + (ido ? "" : cardHtml("둘이 합산", calc(scoped)))
+    ? totalCards + order.map(w => cardHtml(w + " 주식", calc(groups[w]))).join("") + (ido || order.length < 2 ? "" : cardHtml("둘이 합산", calc(scoped)))
     : "";
   if (!scoped.length) {
     $("stkBody").innerHTML = `<tr><td colspan="10"><div class="empty">${ido ? "이도 보유 주식이 없습니다" : "보유 주식이 없습니다"} — ＋ 추가로 종목·평단가·수량을 입력하세요</div></td></tr>`;
@@ -4254,7 +4275,7 @@ function renderStocks() {
     order.forEach(w => {
       const c = calc(groups[w]);
       const pr = c.evalV - c.buy;
-      html += `<tr class="day-sep"><td colspan="10">${esc(w)} · ${groups[w].length}종목${c.buy ? ` · <b style="color:${pr >= 0 ? "var(--exp)" : "var(--accent)"}">${pr >= 0 ? "+" : ""}${fmt(pr)}원 (${(pr / c.buy * 100).toFixed(1)}%)</b>` : ""}</td></tr>`;
+      html += `<tr class="day-sep"><td colspan="10">${esc(w)} · ${groups[w].length}종목${c.buy ? ` · <b style="color:${pr >= 0 ? "var(--exp)" : "var(--accent)"}">${pr >= 0 ? "+" : ""}${money(pr)} (${(pr / c.buy * 100).toFixed(1)}%)</b>` : ""}</td></tr>`;
       groups[w].forEach(s => { html += stkRowHtml(s); });
     });
     $("stkBody").innerHTML = html;
@@ -4350,6 +4371,11 @@ function bindStkRows() {
     tr.addEventListener("dblclick", (ev) => { if (!ev.target.closest("input,button,select")) openEdit(); });
   });
 }
+$("stkCurBtn").addEventListener("click", () => {
+  stkCur = stkCur === "USD" ? "KRW" : "USD";
+  localStorage.setItem("ledgerStkCur", stkCur);
+  renderStocks();
+});
 $("stkAddBtn").addEventListener("click", () => {
   if ($("stkBody").querySelector('.edit-row[data-sid=""]')) return;
   if ($("stkBody").querySelector(".edit-row")) renderStocks();
