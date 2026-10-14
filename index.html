@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>우리가좍가계부</title>
-<meta name="app-version" content="20261014-1715">
+<meta name="app-version" content="20261014-1722">
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="manifest" href="manifest.json">
@@ -315,12 +315,27 @@
   .dlg .ci-modal input { margin:0; }   /* type 없는 입력칸도 전역 여백(-6px/16px)에 안 밀리게 */
   .dlg .ci-modal select { margin:0; width:auto; }
   .dlg .ci-modal th { font-weight:600; color:var(--muted); }
-  .dlg.dlg-wide:has(.ci-modal) { max-width:900px; }            /* 카드내역 창은 가로로 더 넓게 */
-  #ciList { overflow:auto; min-height:130px; }
-  #ciGrip { height:14px; margin-top:4px; border-radius:7px; background:var(--card-2); cursor:ns-resize;
-            display:flex; align-items:center; justify-content:center; user-select:none; }
-  #ciGrip::before { content:""; width:38px; height:3px; border-radius:2px; background:var(--border); }
-  #ciGrip:hover::before { background:var(--muted); }
+  /* 카드내역 창 — 오른쪽 아래 모서리를 끌어 창 크기를 조절, 목록이 남는 공간을 채운다 */
+  .dlg:has(.ci-modal) { max-width:none; width:900px; height:78vh; min-width:520px; min-height:360px;
+                        max-height:94vh; overflow:hidden; display:flex; flex-direction:column; position:relative; }
+  .ci-rz { position:absolute; z-index:3; }
+  .ci-rz-n { top:0; left:14px; right:14px; height:7px; cursor:ns-resize; }
+  .ci-rz-s { bottom:0; left:14px; right:14px; height:7px; cursor:ns-resize; }
+  .ci-rz-w { left:0; top:14px; bottom:14px; width:7px; cursor:ew-resize; }
+  .ci-rz-e { right:0; top:14px; bottom:14px; width:7px; cursor:ew-resize; }
+  .ci-rz-nw { top:0; left:0; width:16px; height:16px; cursor:nwse-resize; }
+  .ci-rz-se { bottom:0; right:0; width:16px; height:16px; cursor:nwse-resize; }
+  .ci-rz-ne { top:0; right:0; width:16px; height:16px; cursor:nesw-resize; }
+  .ci-rz-sw { bottom:0; left:0; width:16px; height:16px; cursor:nesw-resize; }
+  .ci-rz-se::after { content:""; position:absolute; right:4px; bottom:4px; width:8px; height:8px;
+                     border-right:2px solid var(--border); border-bottom:2px solid var(--border); border-radius:0 0 3px 0; }
+  .ci-rz-se:hover::after { border-color:var(--muted); }
+  .dlg:has(.ci-modal) > h3 { flex:none; }
+  .dlg .ci-modal { flex:1; display:flex; flex-direction:column; min-height:0; }
+  #ciList { flex:1; min-height:0; overflow:auto; }
+  .ci-setbox { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; }
+  body.mobile .dlg:has(.ci-modal) { width:96vw; height:86dvh; min-width:0; }
+  body.mobile .ci-rz { display:none; }   /* 폰에선 창이 화면에 꽉 차서 조절 불필요 */
   body.mobile .dlg, body.mobile .dlg.dlg-wide { max-width:96vw; max-height:88dvh; overflow:auto; padding:16px 14px 14px; }
   body.mobile .dlg .ci-modal { overflow-x:auto; } /* 표가 넓으면 모달 안에서 가로 스크롤 */
   @keyframes dlgIn { from { transform:scale(.94); opacity:0; } to { transform:scale(1); opacity:1; } }
@@ -3629,46 +3644,60 @@ async function unifiedImportDialog(txns, errs) {
       <input value="${esc(st.name)}" placeholder="카드명 입력" oninput="ciSetName(${s},this.value)" style="${ss};width:130px;text-align:left" title="${esc(st.srcName || "")}">
       <select onchange="ciSetTarget(${s},this.value)" style="${ss}"><option value="exp"${st.target === "exp" ? " selected" : ""}>생활비</option><option value="region"${st.target === "region" ? " selected" : ""}>지역카드</option></select>
       <span style="color:var(--muted);font-size:11px">${cnt}건</span></div>`; }).join("");
-  const ciListH = localStorage.getItem("ledgerCiListH") || "44vh";   // 지난번에 조절해둔 높이 기억
   const msg = `<div class="ci-modal" style="text-align:left">
-    <div style="display:flex;gap:14px;align-items:center;margin-bottom:6px;font-size:12.5px;flex-wrap:wrap">
-      <label>멤버 <select id="ciBulkWho" style="${ss}">${whos.map(w => `<option>${esc(w)}</option>`).join("")}</select></label>
-      <span id="ciSumm" style="color:var(--muted)">${summHtml()}</span>
+    <div style="margin-bottom:6px;font-size:12.5px"><span id="ciSumm" style="color:var(--muted)">${summHtml()}</span></div>
+    <div style="flex:none;margin-bottom:8px;padding:8px 10px;background:var(--card-2);border-radius:8px;font-size:12px">
+      <div style="color:var(--muted);margin-bottom:6px">등록 설정</div>
+      <div class="ci-setbox">
+        <label style="display:flex;align-items:center;gap:6px">멤버 <select id="ciBulkWho" style="${ss}">${whos.map(w => `<option>${esc(w)}</option>`).join("")}</select></label>
+        ${srcCtl}
+      </div>
     </div>
-    <div style="margin-bottom:8px;padding:8px 10px;background:var(--card-2);border-radius:8px;font-size:12px">
-      <div style="color:var(--muted);margin-bottom:6px">카드별 설정</div>
-      <div style="display:flex;flex-direction:column;gap:6px">${srcCtl}</div>
-    </div>
-    <div id="ciList" style="height:${ciListH};border:1px solid var(--border);border-radius:8px">
+    <div id="ciList" style="border:1px solid var(--border);border-radius:8px">
       <table style="width:100%;border-collapse:collapse;font-size:12.5px">
         <thead><tr style="position:sticky;top:0;background:var(--card-2)">
           <th style="padding:6px 4px;text-align:center"><input type="checkbox" onchange="ciToggleAll(this.checked)" title="전체 선택/해제"></th><th style="padding:6px">카드</th><th style="padding:6px;text-align:left">날짜</th><th style="padding:6px">구분</th><th style="padding:6px;text-align:left">내용(가맹점)</th><th style="padding:6px;text-align:right">금액</th><th style="padding:6px">카테고리</th></tr></thead>
         <tbody id="ciTbody">${txns.map((t, i) => rowH(t, i)).join("")}</tbody>
       </table>
     </div>
-    <div id="ciGrip" title="위아래로 끌어서 목록 높이 조절"></div>
     <div style="margin-top:8px;color:var(--muted);font-size:11.5px">카드명·등록대상은 위에서 지정(형식을 기억해 다음부터 자동) · 생활비=지출 · 지역카드=사용/충전 · 카테고리 자동 추정${errs && errs.length ? `<br>⚠ ${errs.map(esc).join(" / ")}` : ""}</div>
   </div>`;
   const dlgP = dialog({ title: "카드/지역화폐 내역 등록", msg, wide: true, buttons: [{ label: "취소", value: false }, { label: "선택 등록", value: true, primary: true }] });
-  const ciBox = document.getElementById("ciList"), ciGrip = document.getElementById("ciGrip");
-  if (ciBox && ciGrip) {   // 손잡이를 위아래로 끌어 목록 높이 조절 (바꾼 높이는 기억)
-    let y0 = 0, h0 = 0;
-    const move = (ev) => {
-      const h = Math.max(130, Math.min(h0 + (ev.clientY - y0), window.innerHeight * 0.75));
-      ciBox.style.height = Math.round(h) + "px";
-    };
-    const up = () => {
-      document.removeEventListener("pointermove", move);
-      document.removeEventListener("pointerup", up);
-      document.body.style.userSelect = "";
-      localStorage.setItem("ledgerCiListH", ciBox.style.height);
-    };
-    ciGrip.addEventListener("pointerdown", (ev) => {
-      ev.preventDefault();
-      y0 = ev.clientY; h0 = ciBox.getBoundingClientRect().height;
-      document.body.style.userSelect = "none";
-      document.addEventListener("pointermove", move);
-      document.addEventListener("pointerup", up);
+  const ciDlg = document.querySelector("#dlgOverlay .dlg");
+  if (ciDlg) {   // 지난번에 조절해둔 창 크기 복원 + 바뀌면 기억
+    try {
+      const sz = JSON.parse(localStorage.getItem("ledgerCiSize") || "null");
+      if (sz && sz.w > 400 && sz.h > 300) { ciDlg.style.width = Math.min(sz.w, innerWidth - 40) + "px"; ciDlg.style.height = Math.min(sz.h, innerHeight - 40) + "px"; }
+    } catch (e) {}
+    // 네 변·네 모서리 어디로든 끌어서 조절 (가운데 정렬이라 끄는 변이 따라오게 2배로 반영)
+    ["n", "s", "e", "w", "ne", "nw", "se", "sw"].forEach(dir => {
+      const h = document.createElement("div");
+      h.className = "ci-rz ci-rz-" + dir;
+      h.addEventListener("pointerdown", (ev) => {
+        ev.preventDefault();
+        const r = ciDlg.getBoundingClientRect();
+        const x0 = ev.clientX, y0 = ev.clientY, w0 = r.width, h0 = r.height;
+        const clampW = (v) => Math.max(520, Math.min(v, innerWidth - 40));
+        const clampH = (v) => Math.max(360, Math.min(v, innerHeight - 40));
+        const move = (e2) => {
+          const dx = e2.clientX - x0, dy = e2.clientY - y0;
+          if (dir.includes("e")) ciDlg.style.width = clampW(w0 + dx * 2) + "px";
+          if (dir.includes("w")) ciDlg.style.width = clampW(w0 - dx * 2) + "px";
+          if (dir.includes("s")) ciDlg.style.height = clampH(h0 + dy * 2) + "px";
+          if (dir.includes("n")) ciDlg.style.height = clampH(h0 - dy * 2) + "px";
+        };
+        const up = () => {
+          document.removeEventListener("pointermove", move);
+          document.removeEventListener("pointerup", up);
+          document.body.style.userSelect = "";
+          const rr = ciDlg.getBoundingClientRect();
+          localStorage.setItem("ledgerCiSize", JSON.stringify({ w: Math.round(rr.width), h: Math.round(rr.height) }));
+        };
+        document.body.style.userSelect = "none";
+        document.addEventListener("pointermove", move);
+        document.addEventListener("pointerup", up);
+      });
+      ciDlg.appendChild(h);
     });
   }
   const ok = await dlgP;
