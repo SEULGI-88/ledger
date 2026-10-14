@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>우리가좍가계부</title>
-<meta name="app-version" content="20261013-1702">
+<meta name="app-version" content="20261014-1641">
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="manifest" href="manifest.json">
@@ -313,6 +313,9 @@
   .dlg .ci-modal input[type="text"] { margin:0; }
   .dlg .ci-modal select { margin:0; width:auto; }
   .dlg .ci-modal th { font-weight:600; color:var(--muted); }
+  .dlg.dlg-wide:has(.ci-modal) { max-width:900px; }            /* 카드내역 창은 가로로 더 넓게 */
+  #ciList { resize:vertical; overflow:auto; min-height:130px; } /* 오른쪽 아래 모서리를 끌어 높이 조절 */
+  body.mobile #ciList { resize:none; }                          /* 폰에선 손가락으로 끌기 어려워 제외 */
   body.mobile .dlg, body.mobile .dlg.dlg-wide { max-width:96vw; max-height:88dvh; overflow:auto; padding:16px 14px 14px; }
   body.mobile .dlg .ci-modal { overflow-x:auto; } /* 표가 넓으면 모달 안에서 가로 스크롤 */
   @keyframes dlgIn { from { transform:scale(.94); opacity:0; } to { transform:scale(1); opacity:1; } }
@@ -3621,6 +3624,7 @@ async function unifiedImportDialog(txns, errs) {
       <input value="${esc(st.name)}" placeholder="카드명 입력" oninput="ciSetName(${s},this.value)" style="${ss};width:130px;text-align:left" title="${esc(st.srcName || "")}">
       <select onchange="ciSetTarget(${s},this.value)" style="${ss}"><option value="exp"${st.target === "exp" ? " selected" : ""}>생활비</option><option value="region"${st.target === "region" ? " selected" : ""}>지역카드</option></select>
       <span style="color:var(--muted);font-size:11px">${cnt}건</span></div>`; }).join("");
+  const ciListH = localStorage.getItem("ledgerCiListH") || "44vh";   // 지난번에 조절해둔 높이 기억
   const msg = `<div class="ci-modal" style="text-align:left">
     <div style="display:flex;gap:14px;align-items:center;margin-bottom:6px;font-size:12.5px;flex-wrap:wrap">
       <label>멤버 <select id="ciBulkWho" style="${ss}">${whos.map(w => `<option>${esc(w)}</option>`).join("")}</select></label>
@@ -3630,7 +3634,7 @@ async function unifiedImportDialog(txns, errs) {
       <div style="color:var(--muted);margin-bottom:6px">카드별 설정</div>
       <div style="display:flex;flex-direction:column;gap:6px">${srcCtl}</div>
     </div>
-    <div style="max-height:42vh;overflow:auto;border:1px solid var(--border);border-radius:8px">
+    <div id="ciList" style="height:${ciListH};border:1px solid var(--border);border-radius:8px">
       <table style="width:100%;border-collapse:collapse;font-size:12.5px">
         <thead><tr style="position:sticky;top:0;background:var(--card-2)">
           <th style="padding:6px 4px;text-align:center"><input type="checkbox" onchange="ciToggleAll(this.checked)" title="전체 선택/해제"></th><th style="padding:6px">카드</th><th style="padding:6px;text-align:left">날짜</th><th style="padding:6px">구분</th><th style="padding:6px;text-align:left">내용(가맹점)</th><th style="padding:6px;text-align:right">금액</th><th style="padding:6px">카테고리</th></tr></thead>
@@ -3639,7 +3643,16 @@ async function unifiedImportDialog(txns, errs) {
     </div>
     <div style="margin-top:8px;color:var(--muted);font-size:11.5px">카드명·등록대상은 위에서 지정(형식을 기억해 다음부터 자동) · 생활비=지출 · 지역카드=사용/충전 · 카테고리 자동 추정${errs && errs.length ? `<br>⚠ ${errs.map(esc).join(" / ")}` : ""}</div>
   </div>`;
-  const ok = await dialog({ title: "카드/지역화폐 내역 등록", msg, wide: true, buttons: [{ label: "취소", value: false }, { label: "선택 등록", value: true, primary: true }] });
+  const dlgP = dialog({ title: "카드/지역화폐 내역 등록", msg, wide: true, buttons: [{ label: "취소", value: false }, { label: "선택 등록", value: true, primary: true }] });
+  const ciBox = document.getElementById("ciList");
+  if (ciBox && window.ResizeObserver) {   // 끌어서 바꾼 높이를 기억
+    let tm = null;
+    new ResizeObserver(() => {
+      clearTimeout(tm);
+      tm = setTimeout(() => { if (ciBox.style.height) localStorage.setItem("ledgerCiListH", ciBox.style.height); }, 400);
+    }).observe(ciBox);
+  }
+  const ok = await dlgP;
   delete window.ciSetName; delete window.ciSetTarget;
   if (!ok) return;
   const who = document.getElementById("ciBulkWho")?.value || "슬구";
