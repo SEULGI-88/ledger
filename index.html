@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>우리가좍가계부</title>
-<meta name="app-version" content="20261014-1734">
+<meta name="app-version" content="20261014-1737">
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="manifest" href="manifest.json">
@@ -4265,8 +4265,9 @@ function renderStocks() {
     <div class="stat"><div class="label">수익 총합계</div>
       <div class="value" style="color:${totalProfit >= 0 ? "var(--exp)" : "var(--accent)"}">${totalC.buy ? (totalProfit >= 0 ? "+" : "") + money(totalProfit) + " (" + (totalProfit >= 0 ? "+" : "") + (totalProfit / totalC.buy * 100).toFixed(1) + "%)" : "-"}</div>
       <div style="font-size:11px;color:var(--muted);margin-top:2px">${usd ? "환율 " + Number(stockPrices.usdkrw).toFixed(1) + "원/$ 기준" : "원화 환산 기준"}</div></div>` : "";
+  // 사람이 한 명뿐이면 개인 카드가 총합과 똑같으니 생략
   $("stkCards").innerHTML = scoped.length
-    ? totalCards + order.map(w => cardHtml(w + " 주식", calc(groups[w]))).join("") + (ido || order.length < 2 ? "" : cardHtml("둘이 합산", calc(scoped)))
+    ? totalCards + (order.length > 1 ? order.map(w => cardHtml(w + " 주식", calc(groups[w]))).join("") : "")
     : "";
   if (!scoped.length) {
     $("stkBody").innerHTML = `<tr><td colspan="10"><div class="empty">${ido ? "이도 보유 주식이 없습니다" : "보유 주식이 없습니다"} — ＋ 추가로 종목·평단가·수량을 입력하세요</div></td></tr>`;
