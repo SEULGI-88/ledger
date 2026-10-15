@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>우리가좍가계부</title>
-<meta name="app-version" content="20261014-1737">
+<meta name="app-version" content="20261015-1145">
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="manifest" href="manifest.json">
@@ -7262,10 +7262,12 @@ function mRenderCal() {
 }
 function mRenderList() {
   const list = entries.filter(e => fymE(e) === mMonth).sort((a, b) => b.date.localeCompare(a.date) || (b.seq || 0) - (a.seq || 0));
-  const inc = list.filter(e => e.type === "inc").reduce((a, e) => a + e.amount, 0);
   const exp = list.filter(e => e.type === "exp").reduce((a, e) => a + e.amount, 0);
-  let html = `<div class="mstats"><div class="mstat"><div class="l">입금</div><div class="v" style="color:var(--inc)">+${mfmt(inc)}</div></div>
-    <div class="mstat"><div class="l">지출</div><div class="v" style="color:var(--exp)">-${mfmt(exp)}</div></div></div>`;
+  const bi = budgetInfo(mMonth, false);   // 시작예산·남은 금액 — 지금 얼마나 더 쓸 수 있는지가 핵심
+  let html = `<div class="mstats">
+    <div class="mstat"><div class="l">시작금액</div><div class="v">${bi.budget != null ? mfmt(bi.budget) : "-"}</div></div>
+    <div class="mstat"><div class="l">지출</div><div class="v" style="color:var(--exp)">-${mfmt(exp)}</div></div>
+    <div class="mstat"><div class="l">남은 금액</div><div class="v" style="color:${(bi.remain || 0) >= 0 ? "var(--inc)" : "var(--exp)"}">${bi.remain != null ? mfmt(bi.remain) : "-"}</div></div></div>`;
   let last = "";
   list.forEach(e => {
     if (e.date !== last) { html += `<div class="mday">${e.date}</div>`; last = e.date; }
